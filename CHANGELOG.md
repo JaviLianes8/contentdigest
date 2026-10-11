@@ -8,4 +8,6 @@ All notable changes to this project are documented here. The format follows
 
 ## [0.1.0]
 
-- First release.
+- First release: `make_digest`, `parse` and `verify` for RFC 9530 Content-Digest
+  and Repr-Digest header values, with `sha-256` and `sha-512` support and
+  constant-time verification.
