@@ -46,7 +46,7 @@ SUPPORTED_ALGORITHMS = ACTIVE_ALGORITHMS | DEPRECATED_ALGORITHMS
 
 
 def algorithm_names(names: Iterable[str], what: str) -> list[str]:
-    """Lower-case and check a collection of algorithm names, dropping repeats in order."""
+    """Lower-case and check a collection of algorithm names."""
     if isinstance(names, (str, bytes)):
         raise TypeError(f"{what} must be a collection of algorithm names, not a single string")
     result: list[str] = []
@@ -56,8 +56,7 @@ def algorithm_names(names: Iterable[str], what: str) -> list[str]:
         key = name.lower()
         if key not in _FACTORIES:
             raise DigestError(f"unsupported algorithm: {name!r}")
-        if key not in result:
-            result.append(key)
+        result.append(key)
     return result
 
 

@@ -33,19 +33,25 @@ def test_make_digest_takes_any_bytes_like_body(body: object) -> None:
     assert make_digest(body) == SHA256  # type: ignore[arg-type]
 
 
-def test_make_digest_hashes_the_bytes_of_a_wide_buffer() -> None:
-    wide = array("I", [1, 2])
-    assert make_digest(wide) == make_digest(wide.tobytes())
+@pytest.mark.parametrize("algo", ["sha-256", "crc32c", "unixsum", "unixcksum", "adler"])
+def test_make_digest_hashes_the_bytes_of_a_wide_buffer(algo: str) -> None:
+    wide = array("I", [1, 0x01020304])
+    assert make_digest(wide, [algo]) == make_digest(wide.tobytes(), [algo])
 
 
 def test_make_digest_hashes_a_non_contiguous_view() -> None:
     assert make_digest(memoryview(b"abcdef")[::2]) == make_digest(b"ace")
 
 
-@pytest.mark.parametrize("body", ["text", 5, None])
+@pytest.mark.parametrize("body", [5, None])
 def test_make_digest_refuses_a_body_that_is_not_bytes_like(body: object) -> None:
     with pytest.raises(TypeError):
         make_digest(body)  # type: ignore[arg-type]
+
+
+def test_make_digest_says_to_encode_a_text_body() -> None:
+    with pytest.raises(TypeError, match="encode it first"):
+        make_digest("text")  # type: ignore[arg-type]
 
 
 def test_make_digest_rejects_an_unknown_algorithm() -> None:
