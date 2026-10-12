@@ -19,7 +19,7 @@ pytestmark = pytest.mark.skipif(
     os.environ.get("CONTENTDIGEST_E2E") != "1", reason="set CONTENTDIGEST_E2E=1 to build"
 )
 
-PROGRAM = """
+PROGRAM = r"""
 import importlib.metadata, importlib.resources
 import contentdigest as cd
 
