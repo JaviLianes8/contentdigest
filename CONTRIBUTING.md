@@ -6,7 +6,11 @@ Thanks for taking the time. This project keeps a small, predictable shape.
 
 ```
 pip install -r requirements-dev.txt
+python scripts/fetch_vectors.py
 ```
+
+The second line downloads the httpwg structured-field test corpus, which is not kept in the
+repository. Without it, the tests that use it are skipped.
 
 ## Before you open a pull request
 

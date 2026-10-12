@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import sys
 from collections.abc import Sequence
 from typing import BinaryIO, TextIO
@@ -52,7 +53,9 @@ def run(
     out = stdout or sys.stdout
     err = stderr or sys.stderr
     try:
-        args = _parser().parse_args(argv)
+        # argparse prints help and usage errors itself; send them to the injected streams.
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            args = _parser().parse_args(argv)
     except SystemExit as exit_:
         return 0 if exit_.code == 0 else 2
     try:

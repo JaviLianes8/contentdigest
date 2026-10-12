@@ -12,7 +12,7 @@ Progress:
 - [x] Mutation run (guards removed one at a time, each must fail the suite)
 - [x] Docs: README, CHANGELOG, docstrings, packaging metadata
 - [x] Gates: ruff format, ruff check, mypy --strict, pytest
-- [ ] Independent review findings fixed with regression tests
+- [x] Independent review findings fixed with regression tests
 - [ ] Pull request opened, guard clean
 
 ## Starting point
@@ -120,5 +120,34 @@ decision; the README explains Content-Digest versus Repr-Digest), and the obsole
   Two earlier survivors were equivalent mutants (a decimal length limit the digit checks
   already imply, and an ASCII check on `str` that the grammar already implies); that code was
   removed.
-- Not testable by a mutation: constant-time comparison (`hmac.compare_digest` replaced by
-  `==` passes every functional test).
+- The review fixes added 9 more mutations (padding cap, all-padding content, a
+  short-circuiting comparison, `==` instead of `hmac.compare_digest`, the error excerpt,
+  ASCII-only lower-casing in both places, repeated `make_want` keys, CLI stream redirection);
+  every one is killed.
+
+## Review findings fixed
+
+- The httpwg corpus was committed verbatim. It now lives in a gitignored folder fetched by
+  `scripts/fetch_vectors.py` and checked against a tracked MANIFEST (URL, revision, size,
+  SHA-256, licence); the suite tests skip without it, and the corpus was removed from the
+  branch history.
+- Up to two `=` were accepted whatever the length (`abcd==`, and `==` decoded to an empty
+  digest), and the docs attributed over-padding to RFC 9651. Now at most one `=` beyond the
+  padding needed is accepted, all-padding content is rejected, and the docs say which
+  leniency comes from where. Tests pin both sides.
+- "Runs every comparison" had no test: a spy on `hmac.compare_digest` now proves both the
+  count and that the constant-time function is the one used.
+- Error messages embedded the whole field (2 MB in, 2 MB message out); they quote a short
+  excerpt now.
+- `choose_algorithm` raising on a malformed field is documented (docstring and README).
+- `str.lower()` folded non-ASCII letters (Kelvin sign) into registry names; names are
+  lower-cased only when ASCII.
+- argparse help and usage errors bypassed the injected CLI streams; they are redirected.
+- `make_want` silently merged keys that differ only in case; it raises now.
+- A redundant `bytearray` conversion was removed; the contract test file got its docstring.
+
+## Left uncovered
+
+- Python 3.10 is in the classifiers but was not available on any machine here; the suite
+  ran on 3.11, 3.13 and 3.14.
+- The CLI and typing tests use pytest's `tmp_path` for a real file and a mypy snippet.

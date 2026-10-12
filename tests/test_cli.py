@@ -65,13 +65,20 @@ def test_missing_file_exits_2(tmp_path: Path) -> None:
     assert "contentdigest:" in err
 
 
-def test_bad_option_exits_2(capsys: pytest.CaptureFixture[str]) -> None:
-    assert _run("--nope")[0] == 2
+def test_bad_option_exits_2_with_usage_on_the_given_stderr(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    code, out, err = _run("--nope")
+    assert (code, out) == (2, "")
+    assert "usage:" in err
+    assert capsys.readouterr() == ("", "")
 
 
-def test_help_exits_0(capsys: pytest.CaptureFixture[str]) -> None:
-    assert _run("--help")[0] == 0
-    assert "Exit status" in capsys.readouterr().out
+def test_help_exits_0_on_the_given_stdout(capsys: pytest.CaptureFixture[str]) -> None:
+    code, out, _ = _run("--help")
+    assert code == 0
+    assert "Exit status" in out
+    assert capsys.readouterr() == ("", "")
 
 
 def test_module_entry_point_exits_with_the_status(

@@ -53,7 +53,8 @@ def algorithm_names(names: Iterable[str], what: str) -> list[str]:
     for name in names:
         if not isinstance(name, str):
             raise TypeError(f"an algorithm name must be str, not {type(name).__name__}")
-        key = name.lower()
+        # Only ASCII is lower-cased: str.lower() maps some other letters to ASCII ones.
+        key = name.lower() if name.isascii() else name
         if key not in _FACTORIES:
             raise DigestError(f"unsupported algorithm: {name!r}")
         result.append(key)

@@ -55,6 +55,16 @@ def test_make_want_rejects_invalid_keys(key: str) -> None:
         make_want({key: 1})
 
 
+def test_make_want_rejects_a_key_given_twice() -> None:
+    with pytest.raises(DigestError, match="twice"):
+        make_want({"SHA-256": 1, "sha-256": 5})
+
+
+def test_make_want_does_not_fold_non_ascii_letters() -> None:
+    with pytest.raises(DigestError):
+        make_want({chr(0x212A): 1})
+
+
 def test_make_want_needs_a_preference() -> None:
     with pytest.raises(DigestError):
         make_want({})

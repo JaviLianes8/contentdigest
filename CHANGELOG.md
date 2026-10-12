@@ -24,8 +24,9 @@ All notable changes to this project are documented here. The format follows
 
 - Fields are parsed with a complete RFC 9651 structured-field parser, checked against the
   httpwg test suite. Tabs, parameters and repeated keys are handled as the RFC says.
-- Byte sequences with missing padding, one `=` too many or non-zero pad bits are accepted,
-  as RFC 9651 asks; the over-padded examples printed in RFC 9530 now verify.
+- Byte sequences with missing padding or non-zero pad bits are accepted, as RFC 9651 asks,
+  and so is one `=` beyond the padding needed, so the over-padded examples printed in
+  RFC 9530 verify.
 - An empty field parses to an empty dict instead of raising.
 - `verify` checks only Active algorithms unless `accept` says otherwise, and runs every
   comparison.

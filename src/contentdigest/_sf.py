@@ -23,7 +23,7 @@ _T = TypeVar("_T")
 def combine(field: FieldValue) -> str:
     """Join field lines with commas (RFC 9110 section 5.3) into one ASCII string."""
     if isinstance(field, (str, bytes, bytearray)):
-        lines: list[str | bytes] = [bytes(field) if isinstance(field, bytearray) else field]
+        lines: list[str | bytes | bytearray] = [field]
     else:
         lines = list(field)
     texts: list[str] = []

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+import hmac
 from array import array
 
 import pytest
@@ -97,10 +98,6 @@ def test_parse_of_an_empty_field_is_empty() -> None:
     assert parse([]) == {}
 
 
-def test_parse_accepts_missing_padding_and_non_zero_pad_bits() -> None:
-    assert parse("a=:aGVsbG8:, b=:iZ==:") == {"a": b"hello", "b": b"\x89"}
-
-
 @pytest.mark.parametrize(
     "field",
     [
@@ -175,6 +172,25 @@ def test_verify_rejects_unknown_names_in_accept() -> None:
         verify(SHA256, BODY, accept=["sha256"])
     with pytest.raises(TypeError):
         verify(SHA256, BODY, accept="sha-256")
+
+
+def test_verify_runs_every_comparison_in_constant_time(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[tuple[bytes, bytes]] = []
+    real = hmac.compare_digest
+
+    def spy(a: bytes, b: bytes) -> bool:
+        calls.append((a, b))
+        return real(a, b)
+
+    monkeypatch.setattr(hmac, "compare_digest", spy)
+    good512 = make_digest(BODY, algos=["sha-512"])
+    assert verify(f"sha-256=:AAAA:, {good512}", BODY) is False
+    assert len(calls) == 2
+
+
+def test_algorithm_names_are_lower_cased_as_ascii_only() -> None:
+    with pytest.raises(DigestError):
+        make_digest(BODY, algos=["UNIXC" + chr(0x212A) + "SUM"])
 
 
 def test_verify_treats_a_truncated_digest_as_a_mismatch() -> None:

@@ -53,7 +53,9 @@ class Reader:
             self.pos += 1
 
     def fail(self, why: str) -> DigestError:
-        return DigestError(f"{why} at offset {self.pos} of {self.text!r}")
+        # A short excerpt only: a hostile field can be megabytes long and errors get logged.
+        excerpt = self.text[max(0, self.pos - 20) : self.pos + 20]
+        return DigestError(f"{why} at offset {self.pos} (near {excerpt!r})")
 
     def key(self) -> str:
         start = self.pos
@@ -142,9 +144,11 @@ class Reader:
         if not _BASE64.issuperset(content):
             raise self.fail("character outside the base64 alphabet")
         data = content.rstrip("=")
-        # Missing padding, padding up to "==" and non-zero pad bits are accepted, as section
-        # 4.2.7 asks; "=" inside the data or a length no encoder produces is not.
-        if "=" in data or len(content) - len(data) > 2 or len(data) % 4 == 1:
+        pads, needed = len(content) - len(data), -len(data) % 4
+        # Section 4.2.7 asks parsers to accept missing padding and non-zero pad bits. One "="
+        # beyond the padding needed is accepted too: httpwg allows it and RFC 9530 prints it.
+        # "=" inside the data, more padding than that, or a length no encoder produces is not.
+        if "=" in data or len(data) % 4 == 1 or (pads and not data) or pads > min(needed + 1, 2):
             raise self.fail("malformed base64")
         self.pos = end + 1
         return binascii.a2b_base64(data + "=" * (-len(data) % 4))

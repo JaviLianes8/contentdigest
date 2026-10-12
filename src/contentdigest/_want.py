@@ -30,16 +30,18 @@ def parse_want(field: FieldValue) -> dict[str, int]:
 def make_want(preferences: Mapping[str, int]) -> str:
     """Serialize weights by algorithm key as a preference field value.
 
-    Keys are lower-cased and must be valid structured-field keys; weights must be integers
-    from 0 to 10. Unregistered algorithms are allowed, as the field is only a hint.
+    Keys are lower-cased and must be valid structured-field keys, each once; weights must be
+    integers from 0 to 10. Unregistered algorithms are allowed, as the field is only a hint.
     """
     members: dict[str, int] = {}
     for name, weight in preferences.items():
         if not isinstance(name, str):
             raise TypeError(f"an algorithm name must be str, not {type(name).__name__}")
-        key = name.lower()
+        key = name.lower() if name.isascii() else name
         if not _KEY.fullmatch(key):
             raise DigestError(f"not a valid algorithm key: {name!r}")
+        if key in members:
+            raise DigestError(f"algorithm key given twice: {key!r}")
         if type(weight) is not int:
             raise TypeError(f"the weight of {name!r} must be an int, not {type(weight).__name__}")
         if not 0 <= weight <= 10:
@@ -57,7 +59,8 @@ def choose_algorithm(
 
     Returns the ``supported`` algorithm with the highest weight above 0, the first one listed
     in the field on a tie, or ``None`` when the field is absent or names none of them (the
-    sender may then use any algorithm or none: preferences are only a hint).
+    sender may then use any algorithm or none: preferences are only a hint). A malformed
+    field raises :class:`DigestError`; catch it to treat such a field as absent.
     """
     allowed = algorithm_names(supported, "supported")
     if field is None:

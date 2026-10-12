@@ -112,7 +112,8 @@ print(make_want({"sha-512": 10, "sha-256": 5}))
 `choose_algorithm(field, supported=ACTIVE_ALGORITHMS)` returns the supported algorithm with
 the highest weight above 0, the first one in the field on a tie, and `None` when the field
 is absent or names none of them. Preferences are only a hint: on `None` you may still send
-any digest, or none. `parse_want` reads a field and `make_want` writes one.
+any digest, or none. A malformed preference field raises `DigestError`; catch it if you
+want to treat such a field as absent. `parse_want` reads a field and `make_want` writes one.
 
 ## Command line
 
@@ -137,9 +138,10 @@ algorithms. `python -m contentdigest` does the same.
   field an integer from 0 to 10. Anything else makes the whole field invalid and raises
   `DigestError` (a `ValueError`), as RFC 9651 requires. Parameters are ignored. A repeated
   key keeps its last value. An empty field is an empty dict, the same as an absent field.
-- Byte sequences decode as RFC 9651 section 4.2.7 asks: missing `=` padding, one `=` too
-  many (as some RFC 9530 examples print) and non-zero pad bits are accepted; characters
-  outside the base64 alphabet are not.
+- Byte sequences decode as RFC 9651 section 4.2.7 asks: missing `=` padding and non-zero
+  pad bits are accepted. So is one `=` beyond the padding needed, which some RFC 9530
+  examples print. More padding than that, `=` inside the data and characters outside the
+  base64 alphabet are rejected.
 - `verify` and `Verifier` require every accepted member present to match, compare in
   constant time and run every comparison, and raise `DigestError` when no member is
   accepted, since then there is nothing to check.

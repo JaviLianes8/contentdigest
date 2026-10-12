@@ -1,3 +1,7 @@
+"""The public surface: names, version and type information."""
+
+from __future__ import annotations
+
 import importlib.resources
 
 import contentdigest
