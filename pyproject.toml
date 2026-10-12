@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "contentdigest"
-version = "0.1.0"
+version = "0.2.0"
 description = "Build and verify RFC 9530 Content-Digest and Repr-Digest headers, zero dependencies"
 readme = "README.md"
 requires-python = ">=3.10"

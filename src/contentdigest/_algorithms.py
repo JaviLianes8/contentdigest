@@ -1,0 +1,75 @@
+"""The "Hash Algorithms for HTTP Digest Fields" registry (RFC 9530 section 7.2)."""
+
+from __future__ import annotations
+
+import hashlib
+from collections.abc import Callable, Iterable
+from typing import TYPE_CHECKING, Protocol
+
+from ._checksums import Adler32, Crc32c, UnixCksum, UnixSum
+from ._errors import DigestError
+
+if TYPE_CHECKING:
+    import sys
+
+    if sys.version_info >= (3, 12):
+        from collections.abc import Buffer
+    else:
+        from typing_extensions import Buffer
+
+
+class Hasher(Protocol):
+    def update(self, data: memoryview, /) -> None: ...
+    def digest(self) -> bytes: ...
+
+
+_ACTIVE: dict[str, Callable[[], Hasher]] = {
+    "sha-256": hashlib.sha256,
+    "sha-512": hashlib.sha512,
+}
+_DEPRECATED: dict[str, Callable[[], Hasher]] = {
+    "md5": hashlib.md5,
+    "sha": hashlib.sha1,
+    "unixsum": UnixSum,
+    "unixcksum": UnixCksum,
+    "adler": Adler32,
+    "crc32c": Crc32c,
+}
+_FACTORIES = {**_ACTIVE, **_DEPRECATED}
+
+#: Registry status "Active": suitable where an attacker may tamper with content.
+ACTIVE_ALGORITHMS = frozenset(_ACTIVE)
+#: Registry status "Deprecated": only against accidental corruption (RFC 9530 section 5).
+DEPRECATED_ALGORITHMS = frozenset(_DEPRECATED)
+#: Every algorithm this library can produce and verify.
+SUPPORTED_ALGORITHMS = ACTIVE_ALGORITHMS | DEPRECATED_ALGORITHMS
+
+
+def algorithm_names(names: Iterable[str], what: str) -> list[str]:
+    """Lower-case and check a collection of algorithm names, dropping repeats in order."""
+    if isinstance(names, (str, bytes)):
+        raise TypeError(f"{what} must be a collection of algorithm names, not a single string")
+    result: list[str] = []
+    for name in names:
+        if not isinstance(name, str):
+            raise TypeError(f"an algorithm name must be str, not {type(name).__name__}")
+        key = name.lower()
+        if key not in _FACTORIES:
+            raise DigestError(f"unsupported algorithm: {name!r}")
+        if key not in result:
+            result.append(key)
+    return result
+
+
+def new_hasher(name: str) -> Hasher:
+    return _FACTORIES[name]()
+
+
+def as_view(data: Buffer) -> memoryview:
+    """Return the bytes of any buffer as a flat byte view, refusing ``str``."""
+    if isinstance(data, str):
+        raise TypeError("the body must be bytes-like, not str; encode it first")
+    view = memoryview(data)
+    if view.c_contiguous:
+        return view.cast("B") if view.format != "B" or view.ndim != 1 else view
+    return memoryview(view.tobytes())

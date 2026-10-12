@@ -5,10 +5,17 @@ import contentdigest
 # The public API. Add every exported name here as the library grows; this list is the
 # contract and the test below fails if the module and this list disagree.
 PUBLIC_API: list[str] = [
+    "ACTIVE_ALGORITHMS",
+    "DEPRECATED_ALGORITHMS",
     "SUPPORTED_ALGORITHMS",
     "DigestError",
+    "Digester",
+    "Verifier",
+    "choose_algorithm",
     "make_digest",
+    "make_want",
     "parse",
+    "parse_want",
     "verify",
 ]
 
@@ -30,3 +37,7 @@ def test_version_is_a_three_part_string() -> None:
 
 def test_the_package_ships_type_information() -> None:
     assert importlib.resources.files("contentdigest").joinpath("py.typed").is_file()
+
+
+def test_digest_error_is_a_value_error() -> None:
+    assert issubclass(contentdigest.DigestError, ValueError)
