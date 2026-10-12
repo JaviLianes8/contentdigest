@@ -8,10 +8,10 @@ Progress:
 - [x] Streaming `Digester` and `Verifier`, bytes-like bodies, `str` or `bytes` fields, several field lines
 - [x] Want-Content-Digest / Want-Repr-Digest: `parse_want`, `make_want`, `choose_algorithm`
 - [x] Command line tool (`python -m contentdigest`)
-- [ ] Contracts: fetched RFC vectors, httpwg suite, typing snippet, README examples, installed wheel e2e
-- [ ] Mutation run (guards removed one at a time, each must fail the suite)
+- [x] Contracts: fetched RFC vectors, httpwg suite, typing snippet, README examples, installed wheel e2e
+- [x] Mutation run (guards removed one at a time, each must fail the suite)
 - [x] Docs: README, CHANGELOG, docstrings, packaging metadata
-- [ ] Gates: ruff format, ruff check, mypy --strict, pytest
+- [x] Gates: ruff format, ruff check, mypy --strict, pytest
 - [ ] Independent review findings fixed with regression tests
 - [ ] Pull request opened, guard clean
 
@@ -98,3 +98,25 @@ these fields use are emitted), framework middleware (one line of glue per framew
 would add dependencies), content-coding helpers (which bytes to hash is the caller's
 decision; the README explains Content-Digest versus Repr-Digest), and the obsolete RFC 3230
 `Digest` field.
+
+## Verification
+
+- Gates: `ruff format --check .`, `ruff check .`, `mypy --strict src` (also `src tests`) and
+  `pytest` exit 0 on Windows with Python 3.13 and 3.14; the wheel e2e passes with
+  `CONTENTDIGEST_E2E=1` (it builds the wheel, installs it in a fresh venv, drives the API
+  from an empty folder, and runs the installed `contentdigest` script and `python -m`).
+- The httpwg suite: 1598 parsing cases, all passing, including every `can_fail` leniency.
+- Mutations: 62 guards were removed or altered one at a time (every base64 rule, key and
+  token characters, number limits, string and display string rules, booleans, dates, the
+  trailing input and trailing comma checks, repeated keys, inner list separators, tabs,
+  parameter spacing, field line joining, ASCII decoding of bytes, the byte sequence member
+  rule, all versus any, the Active-only default and filter, the empty and unknown algorithm
+  errors, name lower-casing, the bare string refusal, buffer flattening, each checksum's
+  rotation, length, reflection, final XOR, byte order and seed, the Want weight range and
+  type, `make_want` validation, the tie, zero and supported rules of `choose_algorithm`, and
+  the command's accept default, exit codes and file errors). Every one made the suite fail.
+  Two earlier survivors were equivalent mutants (a decimal length limit the digit checks
+  already imply, and an ASCII check on `str` that the grammar already implies); that code was
+  removed.
+- Not testable by a mutation: constant-time comparison (`hmac.compare_digest` replaced by
+  `==` passes every functional test).
