@@ -55,7 +55,9 @@ real peers, it has these gaps:
   characters), section 2.2 (a field-specific constraint violation ignores the whole field).
 - httpwg structured-field-tests at commit `781ba38464b2ec4c547e1e14d007d4f5ace7457e`,
   https://github.com/httpwg/structured-field-tests/tree/781ba38464b2ec4c547e1e14d007d4f5ace7457e:
-  every parsing test file, vendored unchanged with a SHA-256 manifest.
+  every parsing test file. Not committed (third-party corpus): `scripts/fetch_vectors.py`
+  fetches it into a gitignored folder, checked against a tracked MANIFEST (URL, revision,
+  size, SHA-256, licence); the suite tests skip when it is absent.
 
 Derived, not copied: which UNIX `sum` and `cksum` variants RFC 9530 means. The BSD 16-bit
 `sum` and the POSIX `cksum` CRC (length appended), both big-endian, reproduce the Appendix D

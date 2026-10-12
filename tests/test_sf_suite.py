@@ -1,7 +1,8 @@
 """The structured-field parser passes every parsing test of the pinned httpwg suite.
 
 Source: https://github.com/httpwg/structured-field-tests/tree/781ba38464b2ec4c547e1e14d007d4f5ace7457e
-(files vendored unchanged in tests/vectors/httpwg, hashes in MANIFEST.txt).
+The corpus is third-party and not committed: `python scripts/fetch_vectors.py` downloads it
+into tests/vectors/httpwg, checked against MANIFEST.txt. Without it these tests skip.
 """
 
 from __future__ import annotations
@@ -23,15 +24,26 @@ VECTORS = Path(__file__).resolve().parent / "vectors" / "httpwg"
 PARSERS = {"dictionary": parse_dictionary, "list": parse_list, "item": parse_item}
 
 
-def _manifest() -> dict[str, str]:
+def _manifest() -> dict[str, tuple[str, int]]:
     lines = (VECTORS / "MANIFEST.txt").read_text(encoding="utf-8").splitlines()
-    pairs = [line.split() for line in lines if line and not line.startswith("#")]
-    return {name: digest for digest, name in pairs}
+    rows = [line.split() for line in lines if line and not line.startswith("#")]
+    return {name: (digest, int(size)) for digest, size, name in rows}
+
+
+def _present() -> bool:
+    return all((VECTORS / name).is_file() for name in _manifest())
+
+
+pytestmark = pytest.mark.skipif(
+    not _present(), reason="run scripts/fetch_vectors.py to fetch the httpwg corpus"
+)
 
 
 def _cases() -> list[Any]:
+    if not _present():
+        return []
     cases = []
-    for name in sorted(_manifest()):
+    for name in sorted(n for n in _manifest() if n.endswith(".json")):
         for case in json.loads((VECTORS / name).read_text(encoding="utf-8")):
             cases.append(pytest.param(case, id=f"{name}:{case['name']}"))
     return cases
@@ -78,12 +90,10 @@ def _matches(kind: str, ours: Any, expected: Any) -> bool:
     return list(ours) == [k for k, _ in expected] and all(_member(ours[k], v) for k, v in expected)
 
 
-def test_vendored_files_match_the_manifest() -> None:
-    manifest = _manifest()
-    on_disk = {path.name for path in VECTORS.glob("*.json")}
-    assert on_disk == set(manifest)
-    for name, digest in manifest.items():
-        assert hashlib.sha256((VECTORS / name).read_bytes()).hexdigest() == digest, name
+def test_fetched_files_match_the_manifest() -> None:
+    for name, (digest, size) in _manifest().items():
+        data = (VECTORS / name).read_bytes()
+        assert (len(data), hashlib.sha256(data).hexdigest()) == (size, digest), name
 
 
 def test_the_suite_is_not_empty() -> None:
