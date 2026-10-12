@@ -7,10 +7,10 @@ Progress:
 - [x] Algorithm registry: all eight IANA algorithms, Active versus Deprecated, verify accepts Active only by default
 - [x] Streaming `Digester` and `Verifier`, bytes-like bodies, `str` or `bytes` fields, several field lines
 - [x] Want-Content-Digest / Want-Repr-Digest: `parse_want`, `make_want`, `choose_algorithm`
-- [ ] Command line tool (`python -m contentdigest`)
+- [x] Command line tool (`python -m contentdigest`)
 - [ ] Contracts: fetched RFC vectors, httpwg suite, typing snippet, README examples, installed wheel e2e
 - [ ] Mutation run (guards removed one at a time, each must fail the suite)
-- [ ] Docs: README, CHANGELOG, docstrings, packaging metadata
+- [x] Docs: README, CHANGELOG, docstrings, packaging metadata
 - [ ] Gates: ruff format, ruff check, mypy --strict, pytest
 - [ ] Independent review findings fixed with regression tests
 - [ ] Pull request opened, guard clean
