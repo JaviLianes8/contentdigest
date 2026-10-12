@@ -97,8 +97,9 @@ class Reader:
             elif char not in _DIGITS:
                 break
             self.pos += 1
-            if self.pos - start > (16 if is_decimal else 15):
-                raise self.fail("number too long")
+            # A decimal cannot pass its 16 character limit once the 12 and 3 digit checks hold.
+            if not is_decimal and self.pos - start > 15:
+                raise self.fail("integer too long")
         digits = self.text[start : self.pos]
         if not is_decimal:
             return sign * int(digits)

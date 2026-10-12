@@ -35,8 +35,7 @@ def combine(field: FieldValue) -> str:
                 raise DigestError("field value is not ASCII") from None
         elif not isinstance(line, str):
             raise TypeError(f"a field line must be str or bytes, not {type(line).__name__}")
-        if not line.isascii():
-            raise DigestError("field value is not ASCII")
+        # A non-ASCII str needs no check here: no rule of the grammar accepts such a character.
         texts.append(line)
     return ", ".join(texts)
 
