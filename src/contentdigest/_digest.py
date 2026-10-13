@@ -1,86 +1,121 @@
-"""Encode and decode RFC 9530 digest header values."""
+"""Build and verify Content-Digest and Repr-Digest field values (RFC 9530 sections 2, 3)."""
 
 from __future__ import annotations
 
 import base64
-import hashlib
 import hmac
-import re
-from collections.abc import Callable, Iterable
+from collections.abc import Iterable
+from typing import TYPE_CHECKING
 
-_Hasher = Callable[[bytes], "hashlib._Hash"]
+from ._algorithms import ACTIVE_ALGORITHMS, algorithm_names, as_view, new_hasher
+from ._errors import DigestError
+from ._sf import FieldValue, parse_dictionary
 
-_HASHERS: dict[str, _Hasher] = {
-    "sha-256": hashlib.sha256,
-    "sha-512": hashlib.sha512,
-}
+if TYPE_CHECKING:
+    import sys
 
-#: Algorithm names this library can produce and verify.
-SUPPORTED_ALGORITHMS = frozenset(_HASHERS)
-
-# A structured-field dictionary key: lowercase, as required by RFC 8941.
-_KEY = re.compile(r"[a-z*][a-z0-9_.*-]*")
-
-
-class DigestError(ValueError):
-    """Raised when a digest header is malformed or names an unsupported algorithm."""
+    if sys.version_info >= (3, 12):
+        from collections.abc import Buffer
+    else:
+        from typing_extensions import Buffer
 
 
-def make_digest(body: bytes, algos: Iterable[str] = ("sha-256",)) -> str:
-    """Return a Content-Digest / Repr-Digest value for ``body`` over ``algos``.
+class Digester:
+    """Compute a digest field value over a body fed in chunks.
 
-    The value is an RFC 8941 dictionary, one member per algorithm, each digest
-    carried as a byte sequence (``algo=:base64:``). Order follows ``algos``.
+    ``algos`` are registry keys such as ``"sha-256"`` (any case); the value lists them in
+    that order, each once.
     """
-    members: list[str] = []
-    for name in algos:
-        key = name.lower()
-        hasher = _HASHERS.get(key)
-        if hasher is None:
-            raise DigestError(f"unsupported algorithm: {name!r}")
-        encoded = base64.b64encode(hasher(body).digest()).decode("ascii")
-        members.append(f"{key}=:{encoded}:")
-    if not members:
-        raise DigestError("at least one algorithm is required")
-    return ", ".join(members)
+
+    def __init__(self, algos: Iterable[str] = ("sha-256",)) -> None:
+        names = algorithm_names(algos, "algos")
+        if not names:
+            raise DigestError("at least one algorithm is required")
+        self._hashers = {name: new_hasher(name) for name in names}
+
+    def update(self, data: Buffer) -> None:
+        """Feed the next chunk of the body."""
+        view = as_view(data)
+        for hasher in self._hashers.values():
+            hasher.update(view)
+
+    def digests(self) -> dict[str, bytes]:
+        """The raw digest of everything fed so far, by algorithm; more chunks may follow."""
+        return {name: hasher.digest() for name, hasher in self._hashers.items()}
+
+    def value(self) -> str:
+        """The field value for everything fed so far, as an RFC 9651 dictionary."""
+        return ", ".join(
+            f"{name}=:{base64.b64encode(digest).decode('ascii')}:"
+            for name, digest in self.digests().items()
+        )
 
 
-def parse(header: str) -> dict[str, bytes]:
-    """Parse a digest header value into a mapping of algorithm to raw digest bytes.
+class Verifier:
+    """Check a body fed in chunks against a received digest field.
 
-    Every member is returned, including algorithms this library cannot verify.
+    The field is read first, as headers arrive before the body. Only algorithms in
+    ``accept`` are checked (by default the registry's Active ones); every accepted member
+    present must match. :class:`DigestError` is raised if the field is malformed or none of
+    its members is accepted.
+    """
+
+    def __init__(self, field: FieldValue, *, accept: Iterable[str] = ACTIVE_ALGORITHMS) -> None:
+        accepted = algorithm_names(accept, "accept")
+        received = parse(field)
+        self._expected = {name: digest for name, digest in received.items() if name in accepted}
+        if not self._expected:
+            raise DigestError(
+                f"no accepted algorithm in the field (it has {sorted(received)}, "
+                f"accepted are {sorted(accepted)})"
+            )
+        self._digester = Digester(self._expected)
+
+    @property
+    def algorithms(self) -> tuple[str, ...]:
+        """The algorithms that will be checked, in field order."""
+        return tuple(self._expected)
+
+    def update(self, data: Buffer) -> None:
+        """Feed the next chunk of the body."""
+        self._digester.update(data)
+
+    def verify(self) -> bool:
+        """Whether everything fed so far matches every accepted digest in the field."""
+        actual = self._digester.digests()
+        # Every comparison runs, in constant time, so timing does not reveal which failed.
+        results = [hmac.compare_digest(digest, actual[n]) for n, digest in self._expected.items()]
+        return all(results)
+
+
+def make_digest(body: Buffer, algos: Iterable[str] = ("sha-256",)) -> str:
+    """Return a Content-Digest or Repr-Digest field value for ``body`` over ``algos``."""
+    digester = Digester(algos)
+    digester.update(body)
+    return digester.value()
+
+
+def parse(field: FieldValue) -> dict[str, bytes]:
+    """Parse a digest field into raw digest bytes by algorithm key, in field order.
+
+    ``field`` is a ``str``, ASCII ``bytes`` or an iterable of field lines, which are joined
+    with commas. Every member is returned, including algorithms this library does not know.
+    Parameters are ignored. An empty field gives an empty dict. A member whose value is not
+    a byte sequence makes the whole field invalid (RFC 9651 section 2.2).
     """
     result: dict[str, bytes] = {}
-    for raw in header.split(","):
-        member = raw.strip()
-        if not member:
-            raise DigestError("empty dictionary member")
-        key, sep, value = member.partition("=")
-        key = key.strip()
-        value = value.strip()
-        if not sep or not _KEY.fullmatch(key):
-            raise DigestError(f"malformed member: {member!r}")
-        if len(value) < 2 or value[0] != ":" or value[-1] != ":":
-            raise DigestError(f"value is not a byte sequence: {member!r}")
-        try:
-            result[key] = base64.b64decode(value[1:-1], validate=True)
-        except ValueError as exc:
-            raise DigestError(f"invalid base64 in {member!r}") from exc
-    if not result:
-        raise DigestError("no dictionary members")
+    for key, (value, _params) in parse_dictionary(field).items():
+        if type(value) is not bytes:
+            raise DigestError(f"the value of {key!r} is not a byte sequence")
+        result[key] = value
     return result
 
 
-def verify(header: str, body: bytes) -> bool:
-    """Return whether every supported digest in ``header`` matches ``body``.
+def verify(field: FieldValue, body: Buffer, *, accept: Iterable[str] = ACTIVE_ALGORITHMS) -> bool:
+    """Return whether every accepted digest in ``field`` matches ``body``.
 
-    Unsupported algorithms are ignored. If the header carries no supported
-    algorithm there is nothing to check, so a :class:`DigestError` is raised.
+    See :class:`Verifier` for what is accepted and when :class:`DigestError` is raised.
     """
-    checkable = {name: digest for name, digest in parse(header).items() if name in _HASHERS}
-    if not checkable:
-        raise DigestError("header has no supported digest algorithm")
-    return all(
-        hmac.compare_digest(digest, _HASHERS[name](body).digest())
-        for name, digest in checkable.items()
-    )
+    verifier = Verifier(field, accept=accept)
+    verifier.update(body)
+    return verifier.verify()
