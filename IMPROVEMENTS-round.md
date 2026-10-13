@@ -104,11 +104,12 @@ decision; the README explains Content-Digest versus Repr-Digest), and the obsole
 ## Verification
 
 - Gates: `ruff format --check .`, `ruff check .`, `mypy --strict src` (also `src tests`) and
-  `pytest` exit 0 on Windows with Python 3.13 and 3.14; the wheel e2e passes with
+  `pytest` exit 0 on Windows with Python 3.13 (suite also on 3.11 and 3.14); at the final
+  head the full suite with the wheel e2e passes (1822 tests) with
   `CONTENTDIGEST_E2E=1` (it builds the wheel, installs it in a fresh venv, drives the API
   from an empty folder, and runs the installed `contentdigest` script and `python -m`).
 - The httpwg suite: 1598 parsing cases, all passing, including every `can_fail` leniency.
-- Mutations: 62 guards were removed or altered one at a time (the final clean run: 58 of these plus the 9 review mutations) (every base64 rule, key and
+- Mutations: 62 guards were removed or altered one at a time (the final clean run covers 60 of these plus the 9 review mutations) (every base64 rule, key and
   token characters, number limits, string and display string rules, booleans, dates, the
   trailing input and trailing comma checks, repeated keys, inner list separators, tabs,
   parameter spacing, field line joining, ASCII decoding of bytes, the byte sequence member
@@ -148,7 +149,8 @@ decision; the README explains Content-Digest versus Repr-Digest), and the obsole
 - Mutation harness lesson: a restored source file with the same size and timestamp second
   kept loading the mutant's bytecode on the laptop, so one run there had a red baseline and
   reported false kills. The whole run was redone with bytecode writing off, caches purged
-  before every run, and a green baseline checked before and after: 67 mutations, all killed.
+  before every run, and a green baseline checked before and after: 69 mutations at the final head, all killed (run on the PC in a
+  scratch clone, one process).
   The only survivor was an equivalent one (decoding field bytes as ASCII, when the grammar
   already rejects any non-ASCII character); that decode path was simplified away.
 
