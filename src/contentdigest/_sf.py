@@ -5,7 +5,6 @@ from __future__ import annotations
 from collections.abc import Callable, Iterable
 from typing import TypeVar
 
-from ._errors import DigestError
 from ._sf_items import BareItem, Reader
 
 Params = dict[str, BareItem]
@@ -21,21 +20,19 @@ _T = TypeVar("_T")
 
 
 def combine(field: FieldValue) -> str:
-    """Join field lines with commas (RFC 9110 section 5.3) into one ASCII string."""
+    """Join field lines with commas (RFC 9110 section 5.3) into one string."""
     if isinstance(field, (str, bytes, bytearray)):
         lines: list[str | bytes | bytearray] = [field]
     else:
         lines = list(field)
     texts: list[str] = []
     for line in lines:
+        # Non-ASCII needs no check here, in str or bytes: no rule of the grammar accepts such a
+        # character, so the parser rejects it. Latin-1 maps every byte to one character.
         if isinstance(line, (bytes, bytearray)):
-            try:
-                line = bytes(line).decode("ascii")
-            except UnicodeDecodeError:
-                raise DigestError("field value is not ASCII") from None
+            line = bytes(line).decode("latin-1")
         elif not isinstance(line, str):
             raise TypeError(f"a field line must be str or bytes, not {type(line).__name__}")
-        # A non-ASCII str needs no check here: no rule of the grammar accepts such a character.
         texts.append(line)
     return ", ".join(texts)
 
