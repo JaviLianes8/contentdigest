@@ -6,6 +6,39 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-10-18
+
+The public API is now stable: the twelve names in `contentdigest.__all__`, their
+signatures, defaults and error types follow Semantic Versioning from this release on.
+
+### Changed
+
+- `DigestError`, `Digester` and `Verifier` show and pickle as `contentdigest.<Name>`
+  instead of the private module that defines them; `DigestError` pickles made by 0.2.0
+  still load.
+- `md5` and `sha` digests are computed with `usedforsecurity=False`, since RFC 9530 allows
+  them only against accidental corruption.
+- The command exits with status 2 when it cannot read standard input or write its result,
+  and its usage line says so.
+
+### Fixed
+
+- Error messages stay short for any input: a name or key is quoted to 40 characters with
+  its length, a list of names to five, and type names are cut. 0.2.0 quoted inputs whole,
+  so a 1 MB algorithm name gave a 1 MB message and a field of 100,000 members was listed
+  in full by the "no accepted algorithm" message.
+- `make_want` raised a plain `ValueError` while describing a weight too large to print;
+  it raises `DigestError`. Given something other than a mapping it raised
+  `AttributeError`; it raises `TypeError`.
+- `typing.get_type_hints` failed with `NameError` on `make_digest`, `verify` and the
+  `update` methods.
+- The package no longer exposes a stray `annotations` attribute.
+- The command no longer exits 120 with "Exception ignored" on standard error when its
+  reader closes the pipe, no longer exits 0 having printed nothing when standard output is
+  closed, no longer shows a traceback when standard input is closed, and no longer echoes
+  a whole argument in a usage error.
+- Importing `contentdigest.__main__` no longer runs the command.
+
 ## [0.2.0]
 
 ### Added
