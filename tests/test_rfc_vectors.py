@@ -3,7 +3,9 @@
 Source: https://www.rfc-editor.org/rfc/rfc9530.txt, fetched 2026-10-12. Errata:
 https://www.rfc-editor.org/errata/rfc9530 (erratum 8890 for the Brotli bytes of B.4 and B.6).
 Bodies are as the RFC describes them ("followed by an LF" where it says so); the multi-line
-JSON bodies are typed in with the two-space indentation the RFC shows.
+JSON bodies are typed in with the two-space indentation the RFC shows. These copies run
+without the fetched files; test_rfc_text.py reads every value from the text itself and
+checks it against these bodies.
 """
 
 from __future__ import annotations
