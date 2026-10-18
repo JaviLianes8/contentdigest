@@ -4,18 +4,11 @@ from __future__ import annotations
 
 import hashlib
 from collections.abc import Callable, Iterable
-from typing import TYPE_CHECKING, Protocol
+from typing import Protocol
 
 from ._checksums import Adler32, Crc32c, UnixCksum, UnixSum
-from ._errors import DigestError
-
-if TYPE_CHECKING:
-    import sys
-
-    if sys.version_info >= (3, 12):
-        from collections.abc import Buffer
-    else:
-        from typing_extensions import Buffer
+from ._errors import DigestError, excerpt, type_name
+from ._types import Buffer
 
 
 class Hasher(Protocol):
@@ -23,13 +16,19 @@ class Hasher(Protocol):
     def digest(self) -> bytes: ...
 
 
+def _legacy(name: str) -> Callable[[], Hasher]:
+    # RFC 9530 allows MD5 and SHA-1 only against accidental corruption, so they are not used
+    # for security; saying so keeps them working where OpenSSL runs in FIPS mode.
+    return lambda: hashlib.new(name, usedforsecurity=False)
+
+
 _ACTIVE: dict[str, Callable[[], Hasher]] = {
     "sha-256": hashlib.sha256,
     "sha-512": hashlib.sha512,
 }
 _DEPRECATED: dict[str, Callable[[], Hasher]] = {
-    "md5": hashlib.md5,
-    "sha": hashlib.sha1,
+    "md5": _legacy("md5"),
+    "sha": _legacy("sha1"),
     "unixsum": UnixSum,
     "unixcksum": UnixCksum,
     "adler": Adler32,
@@ -52,11 +51,11 @@ def algorithm_names(names: Iterable[str], what: str) -> list[str]:
     result: list[str] = []
     for name in names:
         if not isinstance(name, str):
-            raise TypeError(f"an algorithm name must be str, not {type(name).__name__}")
+            raise TypeError(f"an algorithm name must be str, not {type_name(name)}")
         # Only ASCII is lower-cased: str.lower() maps some other letters to ASCII ones.
         key = name.lower() if name.isascii() else name
         if key not in _FACTORIES:
-            raise DigestError(f"unsupported algorithm: {name!r}")
+            raise DigestError(f"unsupported algorithm: {excerpt(name)}")
         result.append(key)
     return result
 
@@ -69,7 +68,10 @@ def as_view(data: Buffer) -> memoryview:
     """Return the bytes of any buffer as a flat byte view, refusing ``str``."""
     if isinstance(data, str):
         raise TypeError("the body must be bytes-like, not str; encode it first")
-    view = memoryview(data)
+    try:
+        view = memoryview(data)
+    except TypeError:
+        raise TypeError(f"the body must be bytes-like, not {type_name(data)}") from None
     if view.c_contiguous:
         return view.cast("B") if view.format != "B" or view.ndim != 1 else view
     return memoryview(view.tobytes())

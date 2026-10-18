@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable, Iterable
 from typing import TypeVar
 
+from ._errors import type_name
 from ._sf_items import BareItem, Reader
 
 Params = dict[str, BareItem]
@@ -13,7 +14,7 @@ InnerList = tuple[list[Item], Params]
 Member = Item | InnerList
 
 #: A field value as a server or client hands it over: text, raw bytes, or several lines.
-FieldValue = str | bytes | Iterable[str | bytes]
+FieldValue = str | bytes | bytearray | Iterable[str | bytes | bytearray]
 
 _OWS = " \t"
 _T = TypeVar("_T")
@@ -32,7 +33,7 @@ def combine(field: FieldValue) -> str:
         if isinstance(line, (bytes, bytearray)):
             line = bytes(line).decode("latin-1")
         elif not isinstance(line, str):
-            raise TypeError(f"a field line must be str or bytes, not {type(line).__name__}")
+            raise TypeError(f"a field line must be str or bytes, not {type_name(line)}")
         texts.append(line)
     return ", ".join(texts)
 
