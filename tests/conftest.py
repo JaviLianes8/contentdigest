@@ -1,4 +1,4 @@
-"""Access to the fetched third-party files, checked against their manifest."""
+"""Shared helpers: the fetched third-party files, checked against their manifest, and a build."""
 
 from __future__ import annotations
 
@@ -6,6 +6,8 @@ import hashlib
 import html
 import json
 import re
+import subprocess
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -52,3 +54,15 @@ def upstream_prose(name: str) -> str:
 def unfold(text: str) -> str:
     """Undo RFC 8792 single-backslash line wrapping: a final backslash joins the next line."""
     return re.sub(r"\\\n[ ]*", "", text)
+
+
+@pytest.fixture(scope="session")
+def dist(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    """The wheel and sdist built once from this tree (only the end-to-end tests ask for it)."""
+    out = tmp_path_factory.mktemp("dist")
+    root = Path(__file__).resolve().parents[1]
+    built = subprocess.run(
+        [sys.executable, "-m", "build", "--outdir", str(out), str(root)], capture_output=True
+    )
+    assert built.returncode == 0, built.stderr.decode(errors="replace")[-2000:]
+    return out

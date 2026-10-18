@@ -49,7 +49,15 @@ packages = ["src/contentdigest"]
 
 [tool.hatch.build.targets.sdist]
 # Third-party files are fetched locally and never shipped; only their manifest is.
-exclude = ["IMPROVEMENTS-round*.md", "CERT-1.0-*.md", "tests/upstream/*", "!tests/upstream/MANIFEST.json"]
+exclude = [
+    "IMPROVEMENTS-round*.md",
+    "CERT-1.0-*.md",
+    ".github",
+    ".gitattributes",
+    ".gitignore",
+    "tests/upstream/*",
+    "!tests/upstream/MANIFEST.json",
+]
 
 [tool.ruff]
 line-length = 100

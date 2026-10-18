@@ -20,6 +20,10 @@ signatures, defaults and error types follow Semantic Versioning from this releas
   them only against accidental corruption.
 - The command exits with status 2 when it cannot read standard input or write its result,
   and its usage line says so.
+- Fields are typed `str | bytes | bytearray | Iterable[str | bytes | bytearray]`, which is
+  what 0.2.0 already accepted at run time.
+- The sdist no longer ships the repository's process notes or `.github`; the project URL
+  `Repository` is now `Source`.
 
 ### Fixed
 
@@ -38,6 +42,18 @@ signatures, defaults and error types follow Semantic Versioning from this releas
   closed, no longer shows a traceback when standard input is closed, and no longer echoes
   a whole argument in a usage error.
 - Importing `contentdigest.__main__` no longer runs the command.
+- `scripts/release.ps1` refused to upload any version once the name was on PyPI; it now
+  refuses only a version that is already there, and only from a clean tree.
+
+### Added
+
+- Runnable examples in every public docstring, run as doctests, and a GUIDE.
+- Tests that read RFC 9530 (every digest value it prints), its erratum 8890, RFC 9651, the
+  IANA registry, RFC 9260, RFC 7143, RFC 1950, the POSIX `cksum` page and the CRC catalogue
+  from fetched copies; that compare every algorithm with output captured from GNU coreutils,
+  Windows certutil, the Java runtime and Node.js; that compare the parser with `http_sf` and
+  the built values with `requests-http-signature`; seeded fuzz, linear-time and installed
+  wheel tests; and the PyPI release 0.2.0 as an oracle for the upgrade.
 
 ## [0.2.0]
 
