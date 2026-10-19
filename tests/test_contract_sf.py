@@ -114,6 +114,17 @@ def test_spaces_are_allowed_after_a_parameter_semicolon() -> None:
     assert parse_dictionary("a=1;  x=2; y")["a"] == (1, {"x": 2, "y": True})
 
 
+@pytest.mark.parametrize("gap", ["\t", " \t", "\t "])
+def test_a_tab_after_a_parameter_semicolon_is_refused(gap: str) -> None:
+    # Section 4.2.3.2 discards only SP there, never HTAB.
+    with pytest.raises(DigestError):
+        parse_dictionary(f"a=1;{gap}x=2")
+    with pytest.raises(DigestError):
+        parse(f"sha-256=:AAAA:;{gap}x=1")
+    with pytest.raises(DigestError):
+        parse_want(f"sha-256=1;{gap}x")
+
+
 @pytest.mark.parametrize("field", ["1a=1", "_a=1", "-a=1", ".a=1", "Aa=1", "aB=1", "a-B=1"])
 def test_keys_are_lower_case_and_start_with_a_letter_or_star(field: str) -> None:
     # Section 4.2.3.3: key = ( lcalpha / "*" ) *( lcalpha / DIGIT / "_" / "-" / "." / "*" ).
@@ -138,6 +149,29 @@ def test_inner_list_items_must_be_separated_by_spaces(field: str) -> None:
     # Section 4.2.1.2: after each item comes SP or ")".
     with pytest.raises(DigestError):
         parse_dictionary(field)
+
+
+@pytest.mark.parametrize("inner", ["(\t1)", "(1 \t2)", "( \t1)", "(1\t)"])
+def test_a_tab_inside_an_inner_list_is_refused(inner: str) -> None:
+    # Section 4.2.1.2 discards only SP inside an inner list. A later repeat of the key must not
+    # hide the error by overwriting the refused value.
+    for field in (f"a={inner}", f"a={inner}, a=1"):
+        with pytest.raises(DigestError):
+            parse_dictionary(field)
+        with pytest.raises(DigestError):
+            parse_want(field)
+    with pytest.raises(DigestError):
+        parse(f"sha-256={inner}, sha-256=:AAAA:")
+
+
+def test_strings_accept_every_printable_ascii_character() -> None:
+    # Section 4.2.5: unescaped %x20-21 / %x23-5B / %x5D-7E, plus the two escapes.
+    text = "".join(map(chr, range(0x20, 0x7F)))
+    escaped = text.replace("\\", "\\\\").replace('"', '\\"')
+    assert _values(f'a="{escaped}"') == {"a": text}
+    assert parse(f'sha-256=:AAAA:;x="{escaped}"') == {"sha-256": b"\x00\x00\x00"}
+    assert parse_want('a=1;x="a~b"') == {"a": 1}
+    assert _values('a=%"a~b"') == {"a": "a~b"}
 
 
 def test_a_decimal_date_is_refused() -> None:

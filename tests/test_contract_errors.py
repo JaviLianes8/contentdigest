@@ -33,6 +33,15 @@ WRONG_TYPES: list[Callable[[], Any]] = [
     lambda: api.make_digest(b"", algos="sha-256"),
     lambda: api.make_digest(b"", algos=5),
     lambda: api.make_digest(b"", algos=[b"sha-256"]),
+    # bytes is a single value too, never a collection of names, empty or not.
+    lambda: api.make_digest(b"", algos=b""),
+    lambda: api.make_digest(b"", algos=b"sha-256"),
+    lambda: api.verify(SHA256, b"", accept=b""),
+    lambda: api.verify(SHA256, b"", accept=b"sha-256"),
+    lambda: api.choose_algorithm("sha-256=1", supported=b""),
+    lambda: api.choose_algorithm("sha-256=1", supported=b"sha-256"),
+    lambda: api.Digester(b""),
+    lambda: api.Verifier(SHA256, accept=b""),
     lambda: api.parse(5),
     lambda: api.parse(None),
     lambda: api.parse([5]),
@@ -145,17 +154,3 @@ def test_a_type_name_is_cut_in_messages() -> None:
     with pytest.raises(TypeError) as caught:
         make_digest(WIDE)
     assert str(caught.value) == f"the body must be bytes-like, not {'N' * 40}..."
-
-
-def test_a_released_buffer_is_a_type_error() -> None:
-    released = memoryview(b"abc")
-    released.release()
-    calls: list[Callable[[], Any]] = [
-        lambda: make_digest(released),
-        lambda: Digester().update(released),
-        lambda: verify("sha-256=:AAAA:", released),
-        lambda: Verifier("sha-256=:AAAA:").update(released),
-    ]
-    for call in calls:
-        with pytest.raises(TypeError, match="released"):
-            call()

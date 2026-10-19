@@ -143,6 +143,9 @@ print(make_want({"SHA-256": 10, "future-hash": 1}))
 | `DigestError` (a `ValueError`) | malformed field; a member that is not a byte sequence or a weight outside 0 to 10; unsupported algorithm name in `algos`, `accept` or `supported`; no algorithm in `algos`; no accepted member in a verified field; bad key, repeated key, bad weight or no entry in `make_want` |
 | `TypeError` | a body that is `str`, not bytes-like, or a released `memoryview`; a field that is not text, bytes or lines of them; a bare string where a collection of names is expected; a name that is not `str`; `make_want` given something other than a mapping, or a weight that is not an `int` (`bool` included) |
 
+A body whose exporter refuses to give its buffer for another reason, such as a closed `mmap`,
+raises the exporter's own error unchanged (usually a `ValueError`), as 0.2.0 did.
+
 A malformed field is quoted as a window of at most 40 characters around the error, with its
 offset. A name or key is quoted to 40 characters, with its length when it is longer. A list
 of names shows at most five, and long type names are cut, so a hostile megabyte field gives a
@@ -178,7 +181,8 @@ that says what to build or answer with, `algos` in `make_digest` and `Digester` 
 `supported` in `choose_algorithm`, may be passed by position, so `Digester(["sha-512"])` and
 `make_digest(body, ["md5"])` keep working. `accept` in `verify` and `Verifier` is keyword-only,
 so that a third argument to `verify(field, body, ...)` cannot be taken for an expected
-value. The short name `algos` stays for the same reason.
+value. The short name `algos` stays too, since renaming it would break 0.2.0 callers that pass
+it by keyword.
 
 ## Upgrading from 0.2.0
 
@@ -187,7 +191,8 @@ Every result 0.2.0 gave for valid input is the same; the differences are in erro
 - Error messages are shorter and quote inputs only partly.
 - `make_want` raises `TypeError` for a non-mapping (was `AttributeError`) and `DigestError` for
   a weight too large to print (was a plain `ValueError`).
-- A released `memoryview` body raises `TypeError` (was a plain `ValueError`).
+- A released `memoryview` body raises `TypeError` (was a plain `ValueError`). Any other buffer
+  its exporter refuses, such as a closed `mmap`, still raises the exporter's own error.
 - `DigestError`, `Digester` and `Verifier` report `contentdigest` as their module; 0.2.0
   pickles of `DigestError` still load.
 - The command exits 2 instead of 120 when its reader closes the pipe, 2 with a message instead

@@ -1,7 +1,9 @@
 """Build the wheel and sdist, inspect them, install the wheel in a throwaway venv, drive it.
 
 Slow and needs the build backend and network, so it runs only with CONTENTDIGEST_E2E=1 and
-from a source tree. tests/test_e2e_upgrade.py adds the upgrade from PyPI.
+from a source tree: a git checkout or an unpacked sdist. Only a checkout can list its tracked
+files, so the exact sdist listing is compared there alone. tests/test_e2e_upgrade.py adds the
+upgrade from PyPI.
 """
 
 from __future__ import annotations
@@ -130,18 +132,22 @@ def test_wheel_and_sdist_contents(dist: Path) -> None:
     (sdist,) = dist.glob("contentdigest-*.tar.gz")
     with tarfile.open(sdist) as archive:
         shipped = {name.split("/", 1)[-1] for name in archive.getnames() if "/" in name}
-    # Exactly the tracked files minus the excluded ones, plus PKG-INFO: anything else fails.
-    tracked = subprocess.run(
-        ["git", "-C", str(ROOT), "ls-files"], capture_output=True, text=True, check=True
-    ).stdout.split()
-    excluded = ("IMPROVEMENTS-round", "CERT-1.0-", ".github/", ".gitattributes")
-    expected = {name for name in tracked if not name.startswith(excluded)} | {"PKG-INFO"}
-    assert shipped == expected, (sorted(shipped - expected), sorted(expected - shipped))
     for present in ("LICENSE", "GUIDE.md", "tests/upstream/MANIFEST.json", ".gitignore"):
         assert present in shipped, present
     assert [name for name in shipped if name.startswith("tests/upstream/")] == [
         "tests/upstream/MANIFEST.json"
     ]
+    assert not any(name.startswith(("IMPROVEMENTS-round", "CERT-1.0-")) for name in shipped)
+    # Exactly the tracked files minus the excluded ones, plus PKG-INFO: anything else fails.
+    # An unpacked sdist has no git work tree to list, so only a checkout runs this comparison.
+    if not (ROOT / ".git").exists():
+        pytest.skip("not a git work tree: the other content checks passed")
+    tracked = subprocess.run(
+        ["git", "-C", str(ROOT), "ls-files"], capture_output=True, text=True, check=True
+    ).stdout.split()
+    excluded = ("IMPROVEMENTS-round", "CERT-1.0-", ".github/", ".gitattributes")
+    expected = {name for name in tracked if not name.startswith(excluded)}
+    assert shipped == expected | {"PKG-INFO"}, shipped ^ (expected | {"PKG-INFO"})
 
 
 def test_installed_wheel_end_to_end(dist: Path, tmp_path: Path) -> None:

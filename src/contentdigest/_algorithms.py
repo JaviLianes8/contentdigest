@@ -74,8 +74,11 @@ def as_view(data: Buffer) -> memoryview:
     except TypeError:
         raise TypeError(f"the body must be bytes-like, not {type_name(data)}") from None
     except ValueError:
-        # memoryview() refuses a released buffer with ValueError; it has no bytes to read.
-        raise TypeError("the body must be bytes-like, not a released buffer") from None
+        # Only a released memoryview has no bytes at all; any other exporter that refuses (a
+        # closed mmap, a numpy dtype with no buffer format) keeps its own error and reason.
+        if isinstance(data, memoryview):
+            raise TypeError("the body must be bytes-like, not a released memoryview") from None
+        raise
     if view.c_contiguous:
         return view.cast("B") if view.format != "B" or view.ndim != 1 else view
     return memoryview(view.tobytes())

@@ -21,7 +21,8 @@ signatures, defaults and error types follow Semantic Versioning from this releas
 - The command exits with status 2 when it cannot read standard input or write its result,
   and its help text says so.
 - A released `memoryview` passed as a body raises `TypeError`, like any other body that is
-  not bytes-like, instead of the plain `ValueError` of `memoryview()`.
+  not bytes-like, instead of the plain `ValueError` of `memoryview()`. Any other buffer its
+  exporter refuses, such as a closed `mmap`, still raises the exporter's own error.
 - A collection of algorithm names (`algos`, `accept`, `supported`) counts each name once,
   so passing a name many times no longer makes checking a field slower with every repeat.
 - Fields are typed `str | bytes | bytearray | Iterable[str | bytes | bytearray]`, which is
@@ -89,8 +90,10 @@ signatures, defaults and error types follow Semantic Versioning from this releas
 - A bare string passed as `algos` or `accept`, or a body that is not bytes-like, raises
   `TypeError`.
 
-## [0.1.0]
+## [0.1.0] - 2026-10-11
 
-- First release: `make_digest`, `parse` and `verify` for RFC 9530 Content-Digest
+Never published to PyPI; 0.2.0 is the first release there.
+
+- First version: `make_digest`, `parse` and `verify` for RFC 9530 Content-Digest
   and Repr-Digest header values, with `sha-256` and `sha-512` support and
   constant-time verification.
