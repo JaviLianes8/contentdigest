@@ -6,6 +6,7 @@
   the real parser accepts a superset, the padding leniencies of RFC 9651 section 4.2.7, with
   the same values wherever the strict one succeeds. The differences are http_sf's: before
   1.4.0 it refused an empty dictionary, and it stops at dates a Python datetime cannot hold.
+  It runs from Python 3.12, whose strict base64 refuses excess padding as this parser does.
 - requests-http-signature 0.7.1 and 1.0.0 (pyauth): the Content-Digest it builds for
   sha-256 and sha-512 is the one make_digest builds, and verify accepts it.
 """
@@ -15,6 +16,7 @@ from __future__ import annotations
 import base64
 import binascii
 import random
+import sys
 from datetime import datetime
 from decimal import Decimal
 from importlib import metadata
@@ -90,6 +92,9 @@ def _texts(seed: int, count: int) -> list[str]:
     return texts
 
 
+# Before Python 3.12, base64 with validate=True accepts "=" padding beyond what the data needs,
+# so http_sf (and the strict decoder below) did too; this parser refuses it on every version.
+@pytest.mark.skipif(sys.version_info < (3, 12), reason="strict base64 changed in Python 3.12")
 @pytest.mark.parametrize("seed", [9651, 8941])
 def test_http_sf_agrees_with_the_strict_parser(seed: int, monkeypatch: pytest.MonkeyPatch) -> None:
     http_sf = pytest.importorskip("http_sf")
