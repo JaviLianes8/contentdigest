@@ -15,7 +15,7 @@ Progress:
 - [x] Packaging, e2e and upgrade from PyPI 0.2.0, every Python (items 8, 10, 13, 14)
 - [x] Gates (item 15), final run
 - [x] PR #3 and trace guard CLEAN
-- [ ] Five QA lenses (item 19): rounds 1 to 3 fixed, awaiting re-verification
+- [ ] Five QA lenses (item 19): rounds 1 to 5 fixed, awaiting re-verification
 - [ ] Independent reviewer (item 16)
 - [ ] Merge and publish (item 17), left to the maintainer
 
@@ -288,3 +288,29 @@ Verification: on this PC each mutant was applied to the fixed source one at a ti
 `mypy --strict src` and `mypy --strict src tests scripts` exit 0 here. On Elena's PC, CPython
 3.14, from a fresh clone of ff402c6: `ruff format --check .`, `ruff check .`,
 `mypy --strict src` and `pytest --timeout 300` exit 0.
+
+### Round 5
+
+Lenses a, c and e ran on 2b41964. Every finding is fixed in 6169c8c; none is disputed. Each
+behaviour fix has a contract that was red on 2b41964 and is green on 6169c8c.
+
+| Lens | Finding | Change |
+| --- | --- | --- |
+| a A1 | The six public functions reported and pickled under their private modules | `__init__.py` sets `__module__` to `contentdigest` on `choose_algorithm`, `make_digest`, `make_want`, `parse`, `parse_want` and `verify`, as it did for the classes; their doctests are now collected once at the package top. New `test_every_public_callable_reports_and_pickles_as_the_package` checks every callable of `__all__`: module `contentdigest`, no private module in its pickle, and the pickle loads to the same object (6 cases red before the fix). CHANGELOG and GUIDE Upgrading say so; 0.2.0 pickles still load because the private modules still define the functions |
+| a A2 | The GUIDE "Fields as they arrive" example failed `mypy --strict` when copied (a mixed list inferred as `list[Sequence[object]]`) | The variable is annotated `list[str \| bytes]`. New `test_every_example_passes_strict_type_checking` wraps each README and GUIDE block in a function and runs `mypy --strict` over them; it fails on the old GUIDE with exactly the reported error |
+| a A3 | "Errors go to standard error as one short line", but a usage error prints the usage line too | GUIDE Command line: "a usage error prints the usage line before it" |
+| a A4 | A field of the wrong type got a misleading or generic message (`memoryview` reported as `int`, `bytearray` not named, `'int' object is not iterable`) | `_sf.combine` refuses up front any bytes-like value other than `bytes` and `bytearray` and anything not iterable, with "a field must be str, bytes, bytearray or an iterable of them, not <type>"; a bad line says "str, bytes or bytearray". `is_bytes_like` moved to `_types.py` so both checks share it. New `tests/test_contract_limits.py` pins both messages through `parse`, `parse_want`, `verify`, `Verifier` and `choose_algorithm` (where `None` stays an absent field). Behaviour change: an empty `memoryview` or `array` field used to pass as an empty field and now raises `TypeError`; CHANGELOG, GUIDE error table and Upgrading say so |
+| c F1 | An empty body with a zero in its shape (`ctypes` `c_ubyte * 4 * 0`, numpy `zeros((0, 4))`) raised `TypeError` from `memoryview.cast` | `as_view` returns an empty view when the buffer has no bytes. New `test_an_empty_buffer_of_any_shape_is_the_empty_body` sends three zero-shaped `ctypes` buffers through `make_digest`, `Digester.update`, `verify` and `Verifier.update` and expects the empty-body digest; CHANGELOG Fixed and GUIDE Upgrading say so |
+| e F1 (N14) | The 40-character name cut had no boundary test | 40 characters quoted whole, 41 cut with "(41 characters)" |
+| e F2 (N16) | The 40-character type name cut had no boundary test | A type name of 40 shown whole, 41 cut to 40 plus "..." |
+| e F3 (N21) | The 300-character command message cut had no boundary test | A usage error of exactly 300 characters kept whole, 301 cut with "(301 characters)" |
+| e F4 (N08) | The sorted "accepted are" list was pinned only under some hash seeds | `accept` of seven names in reverse order; the message must list `'adler', 'md5', 'sha', 'sha-256', 'sha-512' and 2 more`. Neither the given order nor the set order of those names is sorted (checked for `PYTHONHASHSEED` 0 to 40) |
+
+Verification: on this PC, N14, N16, N21, N08 (`sorted(set(...))` replaced by `list(set(...))`)
+and the order-keeping variant `list(accepted)` were applied one at a time; `tests/test_contract_limits.py`
+fails for each under `PYTHONHASHSEED` 0 to 5 (N14, N16 and N21 under 0, 2 and 3). The other new
+contracts were run against 2b41964 and fail there. `ruff format --check .`, `ruff check .`,
+`mypy --strict src` and `mypy --strict src tests scripts` exit 0 here. On Elena's PC, CPython
+3.14, from a fresh clone of 6169c8c: `ruff format --check .`, `ruff check .`, `mypy --strict src`,
+`mypy --strict src tests scripts` and `pytest --timeout 300` (666 passed, 31 skipped: the fetched
+files, the oracles and the e2e switches were absent) exit 0.
