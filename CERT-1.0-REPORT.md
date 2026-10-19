@@ -206,3 +206,32 @@ oracle and both e2e switches: `ruff format --check .`, `ruff check .`, `mypy --s
 run) exit 0, then the fuzz at ten times scale passes. The new contract files also pass on
 3.10 and 3.11 on this PC. The first try of that run failed the new sdist pin, correctly: the
 job script had been copied into the clone's root and was packed into the sdist.
+
+### Round 2
+
+Lenses a, d and e re-ran on 03659c2 (lenses b and c had passed). Each confirmed its round 1
+findings fixed and lens a accepted the argument for F5. Every new finding is fixed in dd917fe;
+none is disputed. Lens e also reported an operational incident outside the repository, which
+went back to the orchestrator; it needs no change here.
+
+| Lens | Finding | Change |
+| --- | --- | --- |
+| a G1, d D3 | `as_view` turned every `ValueError` from `memoryview()` into "not a released buffer", so a closed `mmap`, a numpy `datetime64` array or any refusing `__buffer__` lost its own error and type | Only a released `memoryview` becomes `TypeError` ("not a released memoryview"); any other exporter's `ValueError` is raised unchanged, as in 0.2.0. New `tests/test_contract_buffers.py` pins the released view, a closed anonymous `mmap` and (3.12+) a `__buffer__` raising `ValueError` through `make_digest`, `Digester.update`, `verify` and `Verifier.update`; red before the fix. GUIDE error section, Upgrading and CHANGELOG say so |
+| a G2 | `## [0.1.0]` undated | `## [0.1.0] - 2026-10-11` (commit 7023bd4), with a line that it was never published to PyPI |
+| a G3 | "`algos` stays for the same reason" gave it the keyword-only reason | It stays because renaming it would break 0.2.0 callers that pass it by keyword |
+| d D2 | `test_wheel_and_sdist_contents` called `git ls-files` with `check=True`, so it failed from an unpacked sdist | The content checks run first everywhere; the exact listing comparison runs only when the root has `.git` and is skipped with a reason otherwise; the module docstring says so |
+| e F3 (N13) | Nothing pinned that `bytes` as a name collection raises `TypeError` | `WRONG_TYPES` gains `b""` and `b"sha-256"` as `algos`, `accept` and `supported`, in the functions and both classes |
+| e F4 (N18) | Nothing pinned that HTAB after a parameter `;` is refused | `test_a_tab_after_a_parameter_semicolon_is_refused` (RFC 9651 section 4.2.3.2), through `parse_dictionary`, `parse` and `parse_want` |
+| e F5 (N19) | Nothing pinned that HTAB inside an inner list is refused | `test_a_tab_inside_an_inner_list_is_refused` (section 4.2.1.2): `(\t1)`, `(1 \t2)`, `( \t1)`, `(1\t)`, alone and with the key repeated later |
+| e F6 (N28) | Nothing pinned that `~` is accepted in an sf-string | `test_strings_accept_every_printable_ascii_character` (section 4.2.5): SP to `~` round-trips, also as a parameter of `parse` and `parse_want`, and `~` in a display string |
+
+Verification: a harness applied N13, N18, N19, N28, the same `~` cut in display strings, and
+the old broad conversion in `as_view`, one at a time to a copy of the fixed tree without the
+fetched files or the oracles; the contract files fail for each of the six. On Elena's PC,
+CPython 3.14, from a fresh clone of dd917fe with the fetched files, `http_sf` 1.4.0,
+`requests-http-signature` 1.0.0, the 0.2.0 oracle and both e2e switches: `ruff format --check .`,
+`ruff check .`, `mypy --strict src`, `mypy --strict src tests scripts` and `pytest` (2156 passed,
+1 skipped: the live coreutils run) exit 0, then the fuzz at ten times scale passes. From the sdist
+built there and unpacked outside any checkout, `CONTENTDIGEST_E2E=1 pytest tests/test_e2e_wheel.py`
+gives 2 passed and 1 skipped (the listing comparison). The changed contract files also pass on
+3.11 and 3.13 on this PC.
