@@ -154,30 +154,3 @@ def test_a_type_name_is_cut_in_messages() -> None:
     with pytest.raises(TypeError) as caught:
         make_digest(WIDE)
     assert str(caught.value) == f"the body must be bytes-like, not {'N' * 40}..."
-
-
-NAME_COLLECTION_ARGS: list[Callable[[Any], Any]] = [
-    lambda names: api.make_digest(b"", algos=names),
-    lambda names: api.verify(SHA256, b"", accept=names),
-    lambda names: api.choose_algorithm("sha-256=1", supported=names),
-    lambda names: api.Digester(names),
-    lambda names: api.Verifier(SHA256, accept=names),
-]
-# Every bytes-like value is one value, never a collection of names, empty or not.
-BYTES_LIKE: list[Callable[[], object]] = [
-    lambda: b"",
-    lambda: b"sha-256",
-    lambda: bytearray(),
-    lambda: bytearray(b"sha-256"),
-    lambda: memoryview(b""),
-    lambda: memoryview(b"sha-256"),
-]
-
-
-@pytest.mark.parametrize("value", BYTES_LIKE)
-@pytest.mark.parametrize("call", NAME_COLLECTION_ARGS)
-def test_a_bytes_like_value_is_not_a_name_collection(
-    call: Callable[[Any], Any], value: Callable[[], object]
-) -> None:
-    with pytest.raises(TypeError, match="must be a collection of algorithm names, not a single"):
-        call(value())

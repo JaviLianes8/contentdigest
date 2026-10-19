@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 from collections.abc import Callable, Iterable
-from typing import Protocol
+from typing import Protocol, cast
 
 from ._checksums import Adler32, Crc32c, UnixCksum, UnixSum
 from ._errors import DigestError, excerpt, type_name
@@ -44,10 +44,21 @@ DEPRECATED_ALGORITHMS = frozenset(_DEPRECATED)
 SUPPORTED_ALGORITHMS = ACTIVE_ALGORITHMS | DEPRECATED_ALGORITHMS
 
 
+def _is_bytes_like(value: object) -> bool:
+    try:
+        memoryview(cast("Buffer", value)).release()
+    except TypeError:
+        return False
+    except ValueError:
+        # The exporter refuses its bytes for now (a closed mmap, a released view): still bytes-like.
+        return True
+    return True
+
+
 def algorithm_names(names: Iterable[str], what: str) -> list[str]:
     """Lower-case and check a collection of algorithm names, keeping each one once."""
     # A bytes-like value iterates as ints, and an empty one would pass as no names at all.
-    if isinstance(names, (str, bytes, bytearray, memoryview)):
+    if isinstance(names, str) or _is_bytes_like(names):
         raise TypeError(
             f"{what} must be a collection of algorithm names, not a single string or bytes value"
         )
