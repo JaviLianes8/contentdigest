@@ -15,7 +15,7 @@ Progress:
 - [x] Packaging, e2e and upgrade from PyPI 0.2.0, every Python (items 8, 10, 13, 14)
 - [x] Gates (item 15), final run
 - [x] PR #3 and trace guard CLEAN
-- [ ] Five QA lenses (item 19): rounds 1 to 5 fixed, awaiting re-verification
+- [ ] Five QA lenses (item 19): rounds 1 to 6 fixed, awaiting re-verification
 - [ ] Independent reviewer (item 16)
 - [ ] Merge and publish (item 17), left to the maintainer
 
@@ -314,3 +314,27 @@ contracts were run against 2b41964 and fail there. `ruff format --check .`, `ruf
 3.14, from a fresh clone of 6169c8c: `ruff format --check .`, `ruff check .`, `mypy --strict src`,
 `mypy --strict src tests scripts` and `pytest --timeout 300` (666 passed, 31 skipped: the fetched
 files, the oracles and the e2e switches were absent) exit 0.
+
+### Round 6
+
+Lenses a and e ran on b785f5e. Lens a confirmed A1 to A4 fixed and lens e confirmed F1 to F4
+fixed (N14, N16, N21, N08 and N08b killed, the last two under `PYTHONHASHSEED` 0 to 99). Every
+new finding is fixed in the commit that adds this section; none is disputed. Each one has a
+contract that is red on b785f5e (or, for a surviving mutant, red with that mutant applied) and
+green after it.
+
+| Lens | Finding | Change |
+| --- | --- | --- |
+| a B1 | A 0.2.0 pickle of `verify` did not load: 0.2.0 defined it in `_digest`, 1.0.0 in `_verify`. The round 5 note that the private modules still define the functions was wrong for it | The same holds for `Verifier`, which 0.2.0 also defined in `_digest`. `_digest` now resolves `Verifier` and `verify` on first access (a module `__getattr__`, so there is no import cycle). New `tests/test_contract_pickles.py` holds the pickles of all nine public callables written by the real 0.2.0 wheel under CPython 3.13, protocols 0 and 4, and asserts each loads as the live object; 4 cases (`Verifier` and `verify`) were red on b785f5e. The GUIDE and CHANGELOG now say every public class and function loads |
+| e G1 (S08) | The empty-shape contract used only `sha-256`, which reads the raw empty view; the checksums do not | `test_an_empty_buffer_of_any_shape_is_the_empty_body` runs once per supported algorithm through `make_digest`, `Digester`, `verify` and `Verifier`; S08 fails it for `crc32c`, `unixcksum` and `unixsum` |
+| e G2 (S18) | No test passed a whole field as `bytearray` | New `test_a_whole_field_as_bytearray_reads_like_the_equal_bytes` in `tests/test_contract_fields.py`: `parse`, `parse_want`, `verify`, `Verifier` and `choose_algorithm` give the same result for a `bytearray`, the equal `bytes` and the `str`; S18 fails all five |
+| e G3 (S19) | Nothing pinned that an error raised by the caller's own iterable of lines reaches the caller unchanged | New `test_an_iterables_own_error_reaches_the_caller_unchanged`: a generator that raises a `TypeError`, or an exception class of its own, after its first line; the same exception object reaches the caller through all five entry points; S19 fails the five `TypeError` cases. The GUIDE Errors section says so |
+| e G4 (S20) | The "a field must be ..." message had no long type name case | Two rows added to `test_a_field_of_the_wrong_type_is_named_in_the_message`: a type name of 40 characters shown whole and one of 41 cut to 40 plus "...", through all five entry points; S20 fails the 41 case |
+
+Verification: on this PC, S08, S18, S19 and S20, and two variants of the B1 fix that resolve
+only one of the two names, were applied one at a time to the fixed source; the new contracts fail
+for each. The hex pickles in the new contract were checked again against the 0.2.0 wheel.
+`ruff format --check .`, `ruff check .`, `mypy --strict src` and `mypy --strict src tests
+scripts` exit 0 here. On Elena's PC, CPython 3.14, from a fresh clone of b785f5e with this
+change applied and the fetched files present: `ruff format --check .`, `ruff check .`, `mypy --strict src` and `pytest --timeout 300` (2332 passed, 12
+skipped) exit 0.

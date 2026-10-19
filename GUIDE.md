@@ -149,6 +149,8 @@ print(make_want({"SHA-256": 10, "future-hash": 1}))
 
 A body whose exporter refuses to give its buffer for another reason, such as a closed `mmap`,
 raises the exporter's own error unchanged (usually a `ValueError`), as 0.2.0 did.
+Likewise, an error raised by a field given as an iterable of lines, while it is read, reaches
+the caller unchanged.
 
 A malformed field is quoted as a window of at most 40 characters around the error, with its
 offset. A name or key is quoted to 40 characters, with its length when it is longer. A list
@@ -207,7 +209,7 @@ Every result 0.2.0 gave for valid input is the same; the differences are in erro
 - An empty body of any shape, such as a zero-length two-dimensional buffer, gives the digest of
   the empty body instead of a `TypeError` from `memoryview.cast`.
 - Every public class and function reports `contentdigest` as its module and pickles under it;
-  0.2.0 pickles of `DigestError` and of the functions still load.
+  0.2.0 pickles of every public class and function still load.
 - The command exits 2 instead of 120 when its reader closes the pipe, 2 with a message instead
   of a traceback when standard input is closed, and 2 instead of 0 when standard output is
   closed.

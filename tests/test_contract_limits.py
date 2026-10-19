@@ -90,6 +90,8 @@ NOT_A_FIELD = "a field must be str, bytes, bytearray or an iterable of them, not
         (array("B"), "array"),
         (5, "int"),
         (None, "NoneType"),
+        (type("T" * 40, (), {})(), "T" * 40),
+        (type("T" * 41, (), {})(), "T" * 40 + "..."),
     ],
 )
 def test_a_field_of_the_wrong_type_is_named_in_the_message(

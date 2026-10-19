@@ -10,7 +10,7 @@ from typing import Any
 
 import pytest
 
-from contentdigest import Digester, Verifier, make_digest, verify
+from contentdigest import SUPPORTED_ALGORITHMS, Digester, Verifier, make_digest, verify
 from contentdigest._types import Buffer
 
 
@@ -54,20 +54,23 @@ def test_an_exporters_own_value_error_reaches_the_caller_unchanged() -> None:
         assert str(caught.value) == "I/O operation on closed file"
 
 
-def test_an_empty_buffer_of_any_shape_is_the_empty_body() -> None:
+@pytest.mark.parametrize("algo", sorted(SUPPORTED_ALGORITHMS))
+def test_an_empty_buffer_of_any_shape_is_the_empty_body(algo: str) -> None:
     # A zero-length dimension: memoryview.cast refuses such a shape, but the body is empty.
-    empty = make_digest(b"")
+    # Every algorithm is checked: the checksums cannot read such a view, unlike hashlib.
+    algos = [algo]
+    empty = make_digest(b"", algos=algos)
     shapes: list[Any] = [
         (ctypes.c_ubyte * 4 * 0)(),
         (ctypes.c_ubyte * 0 * 3)(),
         (ctypes.c_uint32 * 0)(),
     ]
     for body in shapes:
-        assert make_digest(body) == empty
-        digester = Digester()
+        assert make_digest(body, algos=algos) == empty
+        digester = Digester(algos)
         digester.update(body)
         assert digester.value() == empty
-        assert verify(empty, body)
-        verifier = Verifier(empty)
+        assert verify(empty, body, accept=algos)
+        verifier = Verifier(empty, accept=algos)
         verifier.update(body)
         assert verifier.verify()

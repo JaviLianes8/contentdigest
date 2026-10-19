@@ -11,6 +11,15 @@ from ._sf import FieldValue, parse_dictionary
 from ._types import Buffer
 
 
+def __getattr__(name: str) -> object:
+    # 0.2.0 defined Verifier and verify here, and its pickles look for them in this module.
+    if name in ("Verifier", "verify"):
+        from . import _verify
+
+        return getattr(_verify, name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
 class Digester:
     """Compute a digest field value over a body fed in chunks.
 

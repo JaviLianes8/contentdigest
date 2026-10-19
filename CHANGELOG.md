@@ -14,8 +14,9 @@ signatures, defaults and error types follow Semantic Versioning from this releas
 ### Changed
 
 - `DigestError`, `Digester`, `Verifier` and the six public functions show and pickle as
-  `contentdigest.<name>` instead of the private module that defines them; pickles made by
-  0.2.0 still load.
+  `contentdigest.<name>` instead of the private module that defines them; every pickle
+  of them made by 0.2.0 still loads, including those of `Verifier` and `verify`, which now
+  live in another private module.
 - A field given as a bytes-like value other than `bytes` or `bytearray` (`memoryview`,
   `array.array`, `mmap`, ...) raises `TypeError` naming its type. A non-empty one already
   raised `TypeError` (naming `int`, one of its items); an empty one passed as an empty field.
