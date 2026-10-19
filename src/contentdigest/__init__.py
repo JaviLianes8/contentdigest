@@ -22,14 +22,16 @@ from ._want import choose_algorithm, make_want, parse_want
 
 __version__ = "1.0.0"
 
-# The public classes show and pickle as contentdigest.<Name>, so nothing outside depends on
-# the private module that defines them. Their methods follow, so doctest finds them here.
+# The public classes and functions show and pickle as contentdigest.<name>, so nothing outside
+# depends on the private module that defines them. Methods follow, so doctest finds them here.
+for _function in (choose_algorithm, make_digest, make_want, parse, parse_want, verify):
+    _function.__module__ = __name__
 for _cls in (Digester, DigestError, Verifier):
     _cls.__module__ = __name__
     for _member in vars(_cls).values():
         if callable(_member) and getattr(_member, "__module__", "").startswith(__name__ + "._"):
             _member.__module__ = __name__
-del _cls, _member
+del _function, _cls, _member
 
 __all__ = [
     "ACTIVE_ALGORITHMS",

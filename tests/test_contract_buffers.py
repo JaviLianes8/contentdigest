@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ctypes
 import mmap
 import sys
 from collections.abc import Callable
@@ -51,3 +52,22 @@ def test_an_exporters_own_value_error_reaches_the_caller_unchanged() -> None:
             call()
         assert type(caught.value) is ValueError
         assert str(caught.value) == "I/O operation on closed file"
+
+
+def test_an_empty_buffer_of_any_shape_is_the_empty_body() -> None:
+    # A zero-length dimension: memoryview.cast refuses such a shape, but the body is empty.
+    empty = make_digest(b"")
+    shapes: list[Any] = [
+        (ctypes.c_ubyte * 4 * 0)(),
+        (ctypes.c_ubyte * 0 * 3)(),
+        (ctypes.c_uint32 * 0)(),
+    ]
+    for body in shapes:
+        assert make_digest(body) == empty
+        digester = Digester()
+        digester.update(body)
+        assert digester.value() == empty
+        assert verify(empty, body)
+        verifier = Verifier(empty)
+        verifier.update(body)
+        assert verifier.verify()

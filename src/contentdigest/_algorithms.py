@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import hashlib
 from collections.abc import Callable, Iterable
-from typing import Protocol, cast
+from typing import Protocol
 
 from ._checksums import Adler32, Crc32c, UnixCksum, UnixSum
 from ._errors import DigestError, excerpt, type_name
-from ._types import Buffer
+from ._types import Buffer, is_bytes_like
 
 
 class Hasher(Protocol):
@@ -44,21 +44,10 @@ DEPRECATED_ALGORITHMS = frozenset(_DEPRECATED)
 SUPPORTED_ALGORITHMS = ACTIVE_ALGORITHMS | DEPRECATED_ALGORITHMS
 
 
-def _is_bytes_like(value: object) -> bool:
-    try:
-        memoryview(cast("Buffer", value)).release()
-    except TypeError:
-        return False
-    except ValueError:
-        # The exporter refuses its bytes for now (a closed mmap, a released view): still bytes-like.
-        return True
-    return True
-
-
 def algorithm_names(names: Iterable[str], what: str) -> list[str]:
     """Lower-case and check a collection of algorithm names, keeping each one once."""
     # A bytes-like value iterates as ints, and an empty one would pass as no names at all.
-    if isinstance(names, str) or _is_bytes_like(names):
+    if isinstance(names, str) or is_bytes_like(names):
         raise TypeError(
             f"{what} must be a collection of algorithm names, not a single string or bytes value"
         )
@@ -93,6 +82,9 @@ def as_view(data: Buffer) -> memoryview:
         if isinstance(data, memoryview):
             raise TypeError("the body must be bytes-like, not a released memoryview") from None
         raise
+    if view.nbytes == 0:
+        # memoryview.cast refuses a shape with a zero in it, and an empty body is empty anyway.
+        return memoryview(b"")
     if view.c_contiguous:
         return view.cast("B") if view.format != "B" or view.ndim != 1 else view
     return memoryview(view.tobytes())

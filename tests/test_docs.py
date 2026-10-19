@@ -6,6 +6,7 @@ import contextlib
 import io
 import itertools
 import re
+import textwrap
 from pathlib import Path
 
 import pytest
@@ -48,6 +49,23 @@ def test_every_example_prints_its_comments(name: str, text: str, count: int) -> 
         with contextlib.redirect_stdout(out):
             exec(compile(block, name, "exec"), {"__name__": "docs"})
         assert out.getvalue().splitlines() == _expected(block)
+
+
+def test_every_example_passes_strict_type_checking(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    api = pytest.importorskip("mypy.api")
+    # Each block becomes a function of one module, so the blocks reuse names freely.
+    blocks = [*_blocks(README), *_blocks(GUIDE)]
+    source = "\n".join(
+        f"def block_{index}() -> None:\n{textwrap.indent(block, '    ')}"
+        for index, block in enumerate(blocks)
+    )
+    monkeypatch.setenv("MYPYPATH", str(ROOT / "src"))
+    out, err, status = api.run(
+        ["--strict", "--no-incremental", "--cache-dir", str(tmp_path), "-c", source]
+    )
+    assert status == 0, out + err
 
 
 def test_the_readme_links_are_absolute_and_reach_the_guide_and_changelog() -> None:

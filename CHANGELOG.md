@@ -13,9 +13,12 @@ signatures, defaults and error types follow Semantic Versioning from this releas
 
 ### Changed
 
-- `DigestError`, `Digester` and `Verifier` show and pickle as `contentdigest.<Name>`
-  instead of the private module that defines them; `DigestError` pickles made by 0.2.0
-  still load.
+- `DigestError`, `Digester`, `Verifier` and the six public functions show and pickle as
+  `contentdigest.<name>` instead of the private module that defines them; pickles made by
+  0.2.0 still load.
+- A field given as a bytes-like value other than `bytes` or `bytearray` (`memoryview`,
+  `array.array`, `mmap`, ...) raises `TypeError` naming its type. A non-empty one already
+  raised `TypeError` (naming `int`, one of its items); an empty one passed as an empty field.
 - `md5` and `sha` digests are computed with `usedforsecurity=False`, since RFC 9530 allows
   them only against accidental corruption.
 - The command exits with status 2 when it cannot read standard input or write its result,
@@ -43,6 +46,11 @@ signatures, defaults and error types follow Semantic Versioning from this releas
   its length, a list of names to five, and type names are cut. 0.2.0 quoted inputs whole,
   so a 1 MB algorithm name gave a 1 MB message and a field of 100,000 members was listed
   in full by the "no accepted algorithm" message.
+- An empty body of any shape, such as a zero-length two-dimensional buffer from `ctypes` or
+  numpy, raised `TypeError` from `memoryview.cast`; it gives the digest of the empty body.
+- A field that is not a string, bytes or an iterable got the interpreter's generic message
+  ("'int' object is not iterable"); the `TypeError` now says a field was expected and names
+  the type. A field line of the wrong type names `bytearray` among the accepted types.
 - `make_want` raised a plain `ValueError` while describing a weight too large to print;
   it raises `DigestError`. Given something other than a mapping it raised
   `AttributeError`; it raises `TypeError`.

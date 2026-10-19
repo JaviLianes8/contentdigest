@@ -139,8 +139,9 @@ def test_doctests_are_collected_once_at_the_package_top() -> None:
     found = {test.name for test in doctest.DocTestFinder().find(contentdigest) if test.examples}
     expected = {"Digester", "Digester.update", "Digester.digests", "Digester.value"}
     expected |= {"Verifier", "Verifier.algorithms", "Verifier.update", "Verifier.verify"}
+    functions = ["choose_algorithm", "make_digest", "make_want", "parse", "parse_want", "verify"]
     assert found == {"contentdigest"} | {
-        f"contentdigest.{name}" for name in [*expected, "DigestError"]
+        f"contentdigest.{name}" for name in [*expected, *functions, "DigestError"]
     }
 
 
@@ -168,3 +169,17 @@ def test_digest_error_pickles_by_its_public_name() -> None:
 def test_pickles_written_by_0_2_0_still_load(hex_data: str) -> None:
     again = pickle.loads(bytes.fromhex(hex_data))
     assert (type(again), again.args) == (DigestError, ("bad field",))
+
+
+PUBLIC_CALLABLES = [
+    name for name in contentdigest.__all__ if callable(getattr(contentdigest, name))
+]
+
+
+@pytest.mark.parametrize("name", PUBLIC_CALLABLES)
+def test_every_public_callable_reports_and_pickles_as_the_package(name: str) -> None:
+    target = getattr(contentdigest, name)
+    assert target.__module__ == "contentdigest"
+    data = pickle.dumps(target)
+    assert b"contentdigest._" not in data
+    assert pickle.loads(data) is target

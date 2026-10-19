@@ -28,7 +28,10 @@ leniencies it marks as optional:
 ```python
 from contentdigest import DigestError, parse
 
-field = ["sha-256=:X48E9qOokqqrvdts8nOJRJN3OWDUoyWxBf7kbu9DBPE=:;x=1", b"new-hash=:AQID:"]
+field: list[str | bytes] = [
+    "sha-256=:X48E9qOokqqrvdts8nOJRJN3OWDUoyWxBf7kbu9DBPE=:;x=1",
+    b"new-hash=:AQID:",
+]
 print(list(parse(field)), parse(field)["new-hash"])
 # ['sha-256', 'new-hash'] b'\x01\x02\x03'
 print(parse(""))
@@ -142,7 +145,7 @@ print(make_want({"SHA-256": 10, "future-hash": 1}))
 | Raised | When |
 | --- | --- |
 | `DigestError` (a `ValueError`) | malformed field; a member that is not a byte sequence or a weight outside 0 to 10; unsupported algorithm name in `algos`, `accept` or `supported`; no algorithm in `algos`; no accepted member in a verified field; bad key, repeated key, bad weight or no entry in `make_want` |
-| `TypeError` | a body that is `str`, not bytes-like, or a released `memoryview`; a field that is not text, bytes or lines of them; a bare string or bytes-like value (anything with the buffer protocol: `bytes`, `bytearray`, `memoryview`, `array.array`, `mmap`, subclasses included) where a collection of names is expected; a name that is not `str`; `make_want` given something other than a mapping, or a weight that is not an `int` (`bool` included) |
+| `TypeError` | a body that is `str`, not bytes-like, or a released `memoryview`; a field that is not text, bytes or lines of them (a `memoryview` or other bytes-like value other than `bytes` and `bytearray` included); a bare string or bytes-like value (anything with the buffer protocol: `bytes`, `bytearray`, `memoryview`, `array.array`, `mmap`, subclasses included) where a collection of names is expected; a name that is not `str`; `make_want` given something other than a mapping, or a weight that is not an `int` (`bool` included) |
 
 A body whose exporter refuses to give its buffer for another reason, such as a closed `mmap`,
 raises the exporter's own error unchanged (usually a `ValueError`), as 0.2.0 did.
@@ -163,7 +166,8 @@ It prints the field value of `FILE` (or standard input when `FILE` is `-` or mis
 `sha-256`), or with `--verify` the ones accepted (default the Active ones). Exit status: 0 printed
 or matched, 1 mismatch, 2 bad input or an I/O error: a usage error, an unsupported algorithm, a
 malformed field, no accepted algorithm, an unreadable file, no standard input, or a result that
-cannot be written (a closed pipe exits 2 quietly). Errors go to standard error as one short line.
+cannot be written (a closed pipe exits 2 quietly). Errors go to standard error as one short line;
+a usage error prints the usage line before it.
 
 ## Typing
 
@@ -197,8 +201,13 @@ Every result 0.2.0 gave for valid input is the same; the differences are in erro
 - Any bytes-like value (`bytearray`, `memoryview`, `array.array`, `mmap`, ...) given as `algos`,
   `accept` or `supported` raises `TypeError`, as `bytes` already did. An empty one used to pass
   as no names at all.
-- `DigestError`, `Digester` and `Verifier` report `contentdigest` as their module; 0.2.0
-  pickles of `DigestError` still load.
+- A field given as a bytes-like value other than `bytes` or `bytearray` (`memoryview`,
+  `array.array`, `mmap`, ...) raises `TypeError` naming its type. An empty one used to pass as
+  an empty field.
+- An empty body of any shape, such as a zero-length two-dimensional buffer, gives the digest of
+  the empty body instead of a `TypeError` from `memoryview.cast`.
+- Every public class and function reports `contentdigest` as its module and pickles under it;
+  0.2.0 pickles of `DigestError` and of the functions still load.
 - The command exits 2 instead of 120 when its reader closes the pipe, 2 with a message instead
   of a traceback when standard input is closed, and 2 instead of 0 when standard output is
   closed.
