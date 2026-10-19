@@ -141,7 +141,7 @@ print(make_want({"SHA-256": 10, "future-hash": 1}))
 | Raised | When |
 | --- | --- |
 | `DigestError` (a `ValueError`) | malformed field; a member that is not a byte sequence or a weight outside 0 to 10; unsupported algorithm name in `algos`, `accept` or `supported`; no algorithm in `algos`; no accepted member in a verified field; bad key, repeated key, bad weight or no entry in `make_want` |
-| `TypeError` | a body that is `str`, not bytes-like, or a released `memoryview`; a field that is not text, bytes or lines of them; a bare string where a collection of names is expected; a name that is not `str`; `make_want` given something other than a mapping, or a weight that is not an `int` (`bool` included) |
+| `TypeError` | a body that is `str`, not bytes-like, or a released `memoryview`; a field that is not text, bytes or lines of them; a bare string or bytes-like value (`bytes`, `bytearray`, `memoryview`) where a collection of names is expected; a name that is not `str`; `make_want` given something other than a mapping, or a weight that is not an `int` (`bool` included) |
 
 A body whose exporter refuses to give its buffer for another reason, such as a closed `mmap`,
 raises the exporter's own error unchanged (usually a `ValueError`), as 0.2.0 did.
@@ -193,6 +193,8 @@ Every result 0.2.0 gave for valid input is the same; the differences are in erro
   a weight too large to print (was a plain `ValueError`).
 - A released `memoryview` body raises `TypeError` (was a plain `ValueError`). Any other buffer
   its exporter refuses, such as a closed `mmap`, still raises the exporter's own error.
+- A `bytearray` or `memoryview` given as `algos`, `accept` or `supported` raises `TypeError`,
+  as `bytes` already did. An empty one used to pass as no names at all.
 - `DigestError`, `Digester` and `Verifier` report `contentdigest` as their module; 0.2.0
   pickles of `DigestError` still load.
 - The command exits 2 instead of 120 when its reader closes the pipe, 2 with a message instead

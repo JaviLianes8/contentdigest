@@ -46,8 +46,11 @@ SUPPORTED_ALGORITHMS = ACTIVE_ALGORITHMS | DEPRECATED_ALGORITHMS
 
 def algorithm_names(names: Iterable[str], what: str) -> list[str]:
     """Lower-case and check a collection of algorithm names, keeping each one once."""
-    if isinstance(names, (str, bytes)):
-        raise TypeError(f"{what} must be a collection of algorithm names, not a single string")
+    # A bytes-like value iterates as ints, and an empty one would pass as no names at all.
+    if isinstance(names, (str, bytes, bytearray, memoryview)):
+        raise TypeError(
+            f"{what} must be a collection of algorithm names, not a single string or bytes value"
+        )
     result: list[str] = []
     for name in names:
         if not isinstance(name, str):

@@ -23,6 +23,9 @@ signatures, defaults and error types follow Semantic Versioning from this releas
 - A released `memoryview` passed as a body raises `TypeError`, like any other body that is
   not bytes-like, instead of the plain `ValueError` of `memoryview()`. Any other buffer its
   exporter refuses, such as a closed `mmap`, still raises the exporter's own error.
+- A `bytearray` or `memoryview` given as `algos`, `accept` or `supported` raises
+  `TypeError`, as `bytes` already did. An empty one used to pass as no names at all, so
+  `choose_algorithm` returned `None` and the others raised `DigestError`.
 - A collection of algorithm names (`algos`, `accept`, `supported`) counts each name once,
   so passing a name many times no longer makes checking a field slower with every repeat.
 - Fields are typed `str | bytes | bytearray | Iterable[str | bytes | bytearray]`, which is
