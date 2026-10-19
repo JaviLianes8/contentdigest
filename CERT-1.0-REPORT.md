@@ -15,7 +15,7 @@ Progress:
 - [x] Packaging, e2e and upgrade from PyPI 0.2.0, every Python (items 8, 10, 13, 14)
 - [x] Gates (item 15), final run
 - [x] PR #3 and trace guard CLEAN
-- [ ] Five QA lenses (item 19): round 1 fixed, awaiting re-verification
+- [ ] Five QA lenses (item 19): rounds 1 to 3 fixed, awaiting re-verification
 - [ ] Independent reviewer (item 16)
 - [ ] Merge and publish (item 17), left to the maintainer
 
@@ -235,3 +235,21 @@ CPython 3.14, from a fresh clone of dd917fe with the fetched files, `http_sf` 1.
 built there and unpacked outside any checkout, `CONTENTDIGEST_E2E=1 pytest tests/test_e2e_wheel.py`
 gives 2 passed and 1 skipped (the listing comparison). The changed contract files also pass on
 3.11 and 3.13 on this PC.
+
+### Round 3
+
+Lens e re-ran on 70c2a1d (lenses a and d had passed round 2). It confirmed F3 to F6 fixed and
+showed its surviving mutant S08 (HTAB taken as an inner-list separator) to be equivalent: over
+66,429 generated fields the original and the mutant agree on success, failure and error type.
+Its one new finding is fixed in 331d3db; none is disputed.
+
+| Lens | Finding | Change |
+| --- | --- | --- |
+| e F7 (B03, B04) | A `bytearray` or `memoryview` passed as `algos`, `accept` or `supported` was not refused like `bytes`: an empty one passed as no names (`choose_algorithm` returned `None`, the others raised `DigestError`), a non-empty one failed on its first `int` | `algorithm_names` refuses `str`, `bytes`, `bytearray` and `memoryview` with `TypeError`. New `test_a_bytes_like_value_is_not_a_name_collection` sends `b""`, `b"sha-256"`, `bytearray()`, `bytearray(b"sha-256")`, `memoryview(b"")` and `memoryview(b"sha-256")` through `make_digest`, `verify`, `choose_algorithm`, `Digester` and `Verifier`; 20 of its 30 cases were red before the fix. GUIDE error table, Upgrading and CHANGELOG say so |
+
+Verification: on this PC the check was cut back one at a time to `(str, bytes, bytearray)`,
+`(str, bytes, memoryview)` and `(str, bytes)`; `tests/test_contract_errors.py` fails for each.
+`ruff format --check .`, `ruff check .`, `mypy --strict src` and `mypy --strict src tests scripts`
+exit 0 here. On Elena's PC, CPython 3.14, from a fresh clone of 331d3db (without the fetched
+files or the oracles): `ruff format --check .`, `ruff check .`, `mypy --strict src` and `pytest`
+exit 0.
