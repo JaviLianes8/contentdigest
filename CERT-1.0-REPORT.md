@@ -15,7 +15,7 @@ Progress:
 - [x] Packaging, e2e and upgrade from PyPI 0.2.0, every Python (items 8, 10, 13, 14)
 - [x] Gates (item 15), final run
 - [x] PR #3 and trace guard CLEAN
-- [ ] Five QA lenses (item 19)
+- [ ] Five QA lenses (item 19): round 1 fixed, awaiting re-verification
 - [ ] Independent reviewer (item 16)
 - [ ] Merge and publish (item 17), left to the maintainer
 
@@ -175,3 +175,34 @@ fetched files, `http_sf` 1.4.0, `requests-http-signature` 1.0.0, the 0.2.0 oracl
 `mypy --strict src`, `mypy --strict src tests scripts` and `pytest` (2105 passed, 1 skipped:
 the live coreutils run, which needs GNU coreutils and ran on this PC) exit 0; the fuzz at ten
 times scale then passes. The commit after it changes this report only.
+
+## QA lenses (item 19)
+
+### Round 1
+
+Five lenses ran on bd2818b. Lens b (ground truth) raised no finding. Every other
+finding is fixed in 85d9394; none is disputed.
+
+| Lens | Finding | Change |
+| --- | --- | --- |
+| a F1 | Before 3.12 the run-time body hint is `bytes \| bytearray \| memoryview`, not `Buffer` | GUIDE Typing says so and what it means for run-time checkers; `test_the_body_hint_at_run_time_is_what_the_guide_says` pins it on each Python |
+| a F2 | Node.js credited with checksum output | CHANGELOG and CONTRIBUTING: Node.js only decodes the Brotli example of erratum 8890 |
+| a F3 | 0.2.0 undated; "usage line" | `## [0.2.0] - 2026-10-18` (PyPI upload date); "its help text says so" |
+| a F4 | GUIDE: a field is quoted with its length | Reworded: a field is a window of at most 40 characters with its offset; a name or key is cut to 40 with its length |
+| a F5 | `algos` and `supported` positional, `accept` keyword-only | Kept, as in 0.2.0, so callers of 0.2.0 keep working; new GUIDE section "Stable signatures" gives the reason and the CHANGELOG states the shape is stable |
+| c F1 | Repeated names in `accept` / `supported` make checking quadratic | `algorithm_names` keeps each name once (`dict.fromkeys`); two new `test_time_grows_linearly` shapes, red before the fix |
+| c F2 | A released `memoryview` body raised a plain `ValueError` | `as_view` raises `TypeError`; `test_a_released_buffer_is_a_type_error` covers `make_digest`, `Digester.update`, `verify`, `Verifier.update`, red before the fix; GUIDE error table and CHANGELOG updated |
+| d D1 | `.gitignore` excluded in pyproject but always shipped by hatchling | Exclude line removed with a comment; `test_wheel_and_sdist_contents` now pins the sdist to exactly the tracked files minus the excluded ones plus `PKG-INFO` |
+| e F1, F2 | M62 and 11 other RFC 9651 parser mutants survive a clean checkout | Hand-written contract cases in `tests/test_contract_sf.py`, each with its RFC 9651 section: booleans, leading tab, SP after `;`, key characters, repeated key position, inner-list separators, decimal date, OWS before a comma, control characters in strings and display strings, trailing SP |
+
+Verification: lens e's own harness applied M49, M52, M61, M62, M63, M77, M78, M79, M86, M88,
+M89 and M93 one at a time to a copy of the fixed tree, with no fetched files and no oracle;
+`tests/test_contract_sf.py` fails for each of the twelve. While writing the cases, a trailing
+tab after the last dictionary member turned out to be valid (section 4.2.2 discards OWS after
+each member), so it is pinned as accepted and only a leading tab as refused. On Elena's PC,
+CPython 3.14, from a fresh clone of 85d9394 with the fetched files, both oracles, the 0.2.0
+oracle and both e2e switches: `ruff format --check .`, `ruff check .`, `mypy --strict src`,
+`mypy --strict src tests scripts` and `pytest` (2138 passed, 1 skipped: the live coreutils
+run) exit 0, then the fuzz at ten times scale passes. The new contract files also pass on
+3.10 and 3.11 on this PC. The first try of that run failed the new sdist pin, correctly: the
+job script had been copied into the clone's root and was packed into the sdist.
