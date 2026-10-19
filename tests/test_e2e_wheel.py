@@ -96,7 +96,7 @@ def check_program(bindir: Path, work: Path) -> None:
     """Run the consumer program and the command from an empty folder."""
     work.mkdir(exist_ok=True)
     done = _run(bindir / "python", "-I", "-c", PROGRAM, cwd=work)
-    assert (done.returncode, done.stdout.decode().split()) == (0, ["e2e ok"]), done.stderr
+    assert (done.returncode, done.stdout.decode().splitlines()) == (0, ["e2e ok"]), done.stderr
     script = bindir / ("contentdigest.exe" if sys.platform == "win32" else "contentdigest")
     printed = _run(script, "-", cwd=work, stdin=BODY)
     assert (printed.returncode, printed.stdout.decode().strip()) == (0, FIELD)
