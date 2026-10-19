@@ -145,3 +145,17 @@ def test_a_type_name_is_cut_in_messages() -> None:
     with pytest.raises(TypeError) as caught:
         make_digest(WIDE)
     assert str(caught.value) == f"the body must be bytes-like, not {'N' * 40}..."
+
+
+def test_a_released_buffer_is_a_type_error() -> None:
+    released = memoryview(b"abc")
+    released.release()
+    calls: list[Callable[[], Any]] = [
+        lambda: make_digest(released),
+        lambda: Digester().update(released),
+        lambda: verify("sha-256=:AAAA:", released),
+        lambda: Verifier("sha-256=:AAAA:").update(released),
+    ]
+    for call in calls:
+        with pytest.raises(TypeError, match="released"):
+            call()

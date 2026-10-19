@@ -45,7 +45,7 @@ SUPPORTED_ALGORITHMS = ACTIVE_ALGORITHMS | DEPRECATED_ALGORITHMS
 
 
 def algorithm_names(names: Iterable[str], what: str) -> list[str]:
-    """Lower-case and check a collection of algorithm names."""
+    """Lower-case and check a collection of algorithm names, keeping each one once."""
     if isinstance(names, (str, bytes)):
         raise TypeError(f"{what} must be a collection of algorithm names, not a single string")
     result: list[str] = []
@@ -57,7 +57,8 @@ def algorithm_names(names: Iterable[str], what: str) -> list[str]:
         if key not in _FACTORIES:
             raise DigestError(f"unsupported algorithm: {excerpt(name)}")
         result.append(key)
-    return result
+    # Callers test membership against the result, so repeats would multiply that work.
+    return list(dict.fromkeys(result))
 
 
 def new_hasher(name: str) -> Hasher:
@@ -72,6 +73,9 @@ def as_view(data: Buffer) -> memoryview:
         view = memoryview(data)
     except TypeError:
         raise TypeError(f"the body must be bytes-like, not {type_name(data)}") from None
+    except ValueError:
+        # memoryview() refuses a released buffer with ValueError; it has no bytes to read.
+        raise TypeError("the body must be bytes-like, not a released buffer") from None
     if view.c_contiguous:
         return view.cast("B") if view.format != "B" or view.ndim != 1 else view
     return memoryview(view.tobytes())

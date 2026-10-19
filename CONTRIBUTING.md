@@ -16,8 +16,8 @@ page and catalogue that define the checksums. They are not kept in the repositor
 the tests that use them are skipped.
 
 The checksum values captured from real programs (GNU coreutils, Windows certutil, the
-Java and Node.js runtimes) are in `tests/program_output.json`, written by
-`scripts/capture_program_output.py`.
+Java runtime), and Node.js decoding the Brotli example of erratum 8890, are in
+`tests/program_output.json`, written by `scripts/capture_program_output.py`.
 
 ## Before you open a pull request
 

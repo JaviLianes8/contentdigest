@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import collections.abc
 import doctest
 import inspect
 import pickle
+import sys
 import typing
 from collections.abc import Callable
 from typing import Any
@@ -107,6 +109,14 @@ def _member(name: str) -> Any:
 def test_type_hints_resolve_at_run_time(name: str) -> None:
     hints = typing.get_type_hints(SIGNATURES[name][0])
     assert set(hints) == {p[0] for p in SIGNATURES[name][1] if p[0] != "self"} | {"return"}
+
+
+def test_the_body_hint_at_run_time_is_what_the_guide_says() -> None:
+    hint = typing.get_type_hints(make_digest)["body"]
+    if sys.version_info >= (3, 12):
+        assert hint is collections.abc.Buffer
+    else:
+        assert hint == bytes | bytearray | memoryview
 
 
 def test_the_algorithms_property_is_typed() -> None:

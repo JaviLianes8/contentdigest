@@ -49,12 +49,12 @@ packages = ["src/contentdigest"]
 
 [tool.hatch.build.targets.sdist]
 # Third-party files are fetched locally and never shipped; only their manifest is.
+# Hatchling always ships .gitignore, since it decides what the sdist leaves out.
 exclude = [
     "IMPROVEMENTS-round*.md",
     "CERT-1.0-*.md",
     ".github",
     ".gitattributes",
-    ".gitignore",
     "tests/upstream/*",
     "!tests/upstream/MANIFEST.json",
 ]

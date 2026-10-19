@@ -3,7 +3,8 @@
 Hand-written from the RFC 9651 parsing algorithms (sections 4.2.2 and 4.2.3 to 4.2.10), so they
 run without the httpwg corpus or any oracle: a bare key is Boolean true, integers have at most
 15 digits, decimals at most 12 integer and 3 fractional digits, strings escape only DQUOTE and
-backslash, display strings take only lower-case percent escapes.
+backslash, display strings take only lower-case percent escapes. The section of each further rule is
+named next to its test.
 """
 
 from __future__ import annotations
@@ -12,8 +13,8 @@ from decimal import Decimal
 
 import pytest
 
-from contentdigest import DigestError
-from contentdigest._sf import parse_dictionary
+from contentdigest import DigestError, parse, parse_want
+from contentdigest._sf import parse_dictionary, parse_item, parse_list
 
 
 def _values(field: str) -> dict[str, object]:
@@ -73,3 +74,83 @@ def test_tokens_dates_and_inner_lists() -> None:
     assert values["a"] == "*tok/x:y" and type(values["a"]).__name__ == "Token"
     assert values["b"] == -62 and type(values["b"]).__name__ == "Date"
     assert parse_dictionary("c=(1 ?1);p=2")["c"] == ([(1, {}), (True, {})], {"p": 2})
+
+
+def test_booleans_are_only_question_mark_zero_or_one() -> None:
+    assert _values("a=?0, b=?1") == {"a": False, "b": True}
+    assert parse_dictionary("a=1;x=?0;y=?1")["a"] == (1, {"x": False, "y": True})
+
+
+@pytest.mark.parametrize("bad", ["?2", "?", "?a", "?01"])
+def test_any_other_boolean_is_refused_as_a_value_or_a_parameter(bad: str) -> None:
+    for field in (f"a={bad}", f"a=1;x={bad}", f"a=({bad})"):
+        with pytest.raises(DigestError):
+            parse_dictionary(field)
+    with pytest.raises(DigestError):
+        parse(f"sha-256=:AAAA:;x={bad}")
+    with pytest.raises(DigestError):
+        parse_want(f"a=1;x={bad}")
+
+
+# Section 4.2 discards only SP before and after the whole value; sections 4.2.1 and 4.2.2
+# discard OWS (SP or HTAB) after each list or dictionary member, so a tab may end those.
+@pytest.mark.parametrize("field", ["\ta=1", "\ta=1, b=2", " \ta=1"])
+def test_a_leading_tab_is_refused(field: str) -> None:
+    with pytest.raises(DigestError):
+        parse_dictionary(field)
+    with pytest.raises(DigestError):
+        parse_item("\t1")
+
+
+def test_spaces_at_either_end_and_ows_around_commas_are_accepted() -> None:
+    assert _values("  a=1 \t,\t b=2 \t ") == {"a": 1, "b": 2}
+    with pytest.raises(DigestError):
+        parse_item("1\t")
+    assert parse_item(" 1  ") == (1, {}) and parse_list(" 1 \t, 2  ") == [(1, {}), (2, {})]
+
+
+def test_spaces_are_allowed_after_a_parameter_semicolon() -> None:
+    # Section 4.2.3.2 discards SP after ";" before the parameter key.
+    assert parse_dictionary("a=1;  x=2; y")["a"] == (1, {"x": 2, "y": True})
+
+
+@pytest.mark.parametrize("field", ["1a=1", "_a=1", "-a=1", ".a=1", "Aa=1", "aB=1", "a-B=1"])
+def test_keys_are_lower_case_and_start_with_a_letter_or_star(field: str) -> None:
+    # Section 4.2.3.3: key = ( lcalpha / "*" ) *( lcalpha / DIGIT / "_" / "-" / "." / "*" ).
+    with pytest.raises(DigestError):
+        parse_dictionary(field)
+    with pytest.raises(DigestError):
+        parse(field.replace("=1", "=:AAAA:"))
+
+
+def test_valid_keys_with_every_allowed_character() -> None:
+    assert list(parse_dictionary("*a=1, a0_-.*=2")) == ["*a", "a0_-.*"]
+
+
+def test_a_repeated_key_keeps_its_first_position_and_its_last_value() -> None:
+    # Section 4.2.2: a repeated key overwrites the value in place.
+    assert list(parse_dictionary("a=1, b=2, a=3").items()) == [("a", (3, {})), ("b", (2, {}))]
+    assert list(parse("a=:AQ==:, b=:Ag==:, a=:Aw==:").items()) == [("a", b"\x03"), ("b", b"\x02")]
+
+
+@pytest.mark.parametrize("field", ['a=(abc"def")', "a=(1?1)", "a=(1(2))", "a=(x:AA==:)"])
+def test_inner_list_items_must_be_separated_by_spaces(field: str) -> None:
+    # Section 4.2.1.2: after each item comes SP or ")".
+    with pytest.raises(DigestError):
+        parse_dictionary(field)
+
+
+def test_a_decimal_date_is_refused() -> None:
+    # Section 4.2.9: a date is an integer.
+    with pytest.raises(DigestError):
+        parse_dictionary("a=@1.5")
+    assert _values("a=@0") == {"a": 0}
+
+
+@pytest.mark.parametrize("char", ["\t", "\x7f", "\x00", "\x1f", "\n"])
+def test_control_characters_are_refused_in_strings_and_display_strings(char: str) -> None:
+    # Sections 4.2.5 and 4.2.10: only %x20-7E may appear unescaped.
+    with pytest.raises(DigestError, match="control character in string"):
+        parse_dictionary(f'a="x{char}y"')
+    with pytest.raises(DigestError, match="control character in display string"):
+        parse_dictionary(f'a=%"x{char}y"')

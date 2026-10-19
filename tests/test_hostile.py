@@ -17,6 +17,7 @@ from contentdigest import (
     make_want,
     parse,
     parse_want,
+    verify,
 )
 from contentdigest._sf import parse_dictionary
 
@@ -44,6 +45,17 @@ SHAPES: dict[str, tuple[int, Callable[[int], Callable[[], object]]]] = {
     "make want": (20_000, lambda n: lambda: make_want({f"k{i}": 1 for i in range(n)})),
     "verifier": (20_000, lambda n: lambda: Verifier(",".join(f"k{i}=:AA==:" for i in range(n)))),
     "broken at the end": (20_000, lambda n: lambda: parse("a=:AA==:," * n + "!")),
+    # A caller may pass the same name many times; the field is still the attacker's.
+    "repeated accept names": (
+        4_000,
+        lambda n: (
+            lambda: verify(",".join(f"k{i}=:AA==:" for i in range(n)), b"", accept=["sha-256"] * n)
+        ),
+    ),
+    "repeated supported names": (
+        4_000,
+        lambda n: lambda: choose_algorithm(",".join(f"k{i}=9" for i in range(n)), ["sha-256"] * n),
+    ),
 }
 
 

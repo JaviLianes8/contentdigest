@@ -129,16 +129,19 @@ def test_wheel_and_sdist_contents(dist: Path) -> None:
     )
     (sdist,) = dist.glob("contentdigest-*.tar.gz")
     with tarfile.open(sdist) as archive:
-        listing = [name.split("/", 1)[-1] for name in archive.getnames()]
-    for present in ("LICENSE", "README.md", "GUIDE.md", "CHANGELOG.md", "PKG-INFO"):
-        assert present in listing, present
-    for present in ("tests/upstream/MANIFEST.json", "tests/program_output.json"):
-        assert present in listing, present
-    assert "scripts/fetch_upstream.py" in listing
-    upstream = [name for name in listing if name.startswith("tests/upstream/")]
-    assert upstream == ["tests/upstream/MANIFEST.json"]
-    for absent in ("IMPROVEMENTS-round", "CERT-1.0-", ".github", "__pycache__", ".pyc", "dist/"):
-        assert not any(absent in name for name in listing), absent
+        shipped = {name.split("/", 1)[-1] for name in archive.getnames() if "/" in name}
+    # Exactly the tracked files minus the excluded ones, plus PKG-INFO: anything else fails.
+    tracked = subprocess.run(
+        ["git", "-C", str(ROOT), "ls-files"], capture_output=True, text=True, check=True
+    ).stdout.split()
+    excluded = ("IMPROVEMENTS-round", "CERT-1.0-", ".github/", ".gitattributes")
+    expected = {name for name in tracked if not name.startswith(excluded)} | {"PKG-INFO"}
+    assert shipped == expected, (sorted(shipped - expected), sorted(expected - shipped))
+    for present in ("LICENSE", "GUIDE.md", "tests/upstream/MANIFEST.json", ".gitignore"):
+        assert present in shipped, present
+    assert [name for name in shipped if name.startswith("tests/upstream/")] == [
+        "tests/upstream/MANIFEST.json"
+    ]
 
 
 def test_installed_wheel_end_to_end(dist: Path, tmp_path: Path) -> None:

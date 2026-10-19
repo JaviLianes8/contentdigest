@@ -43,7 +43,7 @@ except DigestError as error:
 ## Building a value
 
 `make_digest(body, algos)` and `Digester(algos)` take registry keys in any case; the value
-lists each algorithm once, in the order given, as `name=:base64:` members separated by
+lists each algorithm once (a repeated name counts once), in the order given, as `name=:base64:` members separated by
 `", "`. A body is any bytes-like object (`bytes`, `bytearray`, `memoryview`, `array.array`,
 a ctypes object): its raw bytes are hashed, whatever its item size, shape or strides.
 A `str` body raises `TypeError`, since only the caller knows its encoding.
@@ -141,11 +141,12 @@ print(make_want({"SHA-256": 10, "future-hash": 1}))
 | Raised | When |
 | --- | --- |
 | `DigestError` (a `ValueError`) | malformed field; a member that is not a byte sequence or a weight outside 0 to 10; unsupported algorithm name in `algos`, `accept` or `supported`; no algorithm in `algos`; no accepted member in a verified field; bad key, repeated key, bad weight or no entry in `make_want` |
-| `TypeError` | a body that is `str` or not bytes-like; a field that is not text, bytes or lines of them; a bare string where a collection of names is expected; a name that is not `str`; `make_want` given something other than a mapping, or a weight that is not an `int` (`bool` included) |
+| `TypeError` | a body that is `str`, not bytes-like, or a released `memoryview`; a field that is not text, bytes or lines of them; a bare string where a collection of names is expected; a name that is not `str`; `make_want` given something other than a mapping, or a weight that is not an `int` (`bool` included) |
 
-Messages quote at most 40 characters of a field, name or key (with its length when it is
-longer), at most five names of a list, and cut long type names, so a hostile megabyte field
-gives a short message. A `DigestError` pickles as `contentdigest.DigestError`.
+A malformed field is quoted as a window of at most 40 characters around the error, with its
+offset. A name or key is quoted to 40 characters, with its length when it is longer. A list
+of names shows at most five, and long type names are cut, so a hostile megabyte field gives a
+short message. A `DigestError` pickles as `contentdigest.DigestError`.
 
 ## Command line
 
@@ -165,7 +166,19 @@ cannot be written (a closed pipe exits 2 quietly). Errors go to standard error a
 The package ships `py.typed` and passes `mypy --strict`. Bodies are typed as
 `collections.abc.Buffer` (`typing_extensions.Buffer` before Python 3.12) and fields as `str |
 bytes | bytearray | Iterable[str | bytes | bytearray]`. `typing.get_type_hints` resolves every
-public function and method at run time.
+public function and method at run time. Before Python 3.12 there is no run-time `Buffer`, so
+there the body hint resolves to `bytes | bytearray | memoryview`: static checkers still see
+`Buffer`, but a run-time checker (pydantic, typeguard, beartype) then refuses an
+`array.array` or ctypes body that the functions themselves accept.
+
+## Stable signatures
+
+The signatures are the ones 0.2.0 had and are kept as they are. The collection of names
+that says what to build or answer with, `algos` in `make_digest` and `Digester` and
+`supported` in `choose_algorithm`, may be passed by position, so `Digester(["sha-512"])` and
+`make_digest(body, ["md5"])` keep working. `accept` in `verify` and `Verifier` is keyword-only,
+so that a third argument to `verify(field, body, ...)` cannot be taken for an expected
+value. The short name `algos` stays for the same reason.
 
 ## Upgrading from 0.2.0
 
@@ -174,6 +187,7 @@ Every result 0.2.0 gave for valid input is the same; the differences are in erro
 - Error messages are shorter and quote inputs only partly.
 - `make_want` raises `TypeError` for a non-mapping (was `AttributeError`) and `DigestError` for
   a weight too large to print (was a plain `ValueError`).
+- A released `memoryview` body raises `TypeError` (was a plain `ValueError`).
 - `DigestError`, `Digester` and `Verifier` report `contentdigest` as their module; 0.2.0
   pickles of `DigestError` still load.
 - The command exits 2 instead of 120 when its reader closes the pipe, 2 with a message instead

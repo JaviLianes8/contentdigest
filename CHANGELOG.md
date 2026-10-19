@@ -19,11 +19,17 @@ signatures, defaults and error types follow Semantic Versioning from this releas
 - `md5` and `sha` digests are computed with `usedforsecurity=False`, since RFC 9530 allows
   them only against accidental corruption.
 - The command exits with status 2 when it cannot read standard input or write its result,
-  and its usage line says so.
+  and its help text says so.
+- A released `memoryview` passed as a body raises `TypeError`, like any other body that is
+  not bytes-like, instead of the plain `ValueError` of `memoryview()`.
+- A collection of algorithm names (`algos`, `accept`, `supported`) counts each name once,
+  so passing a name many times no longer makes checking a field slower with every repeat.
 - Fields are typed `str | bytes | bytearray | Iterable[str | bytes | bytearray]`, which is
   what 0.2.0 already accepted at run time.
 - The sdist no longer ships the repository's process notes or `.github`; the project URL
-  `Repository` is now `Source`.
+  `Repository` is now `Source`. It ships `.gitignore`, which the build backend always adds.
+- The signatures are those of 0.2.0 and are now stable: `algos` and `supported` may be
+  passed by position, `accept` only by keyword (see the GUIDE).
 
 ### Fixed
 
@@ -51,11 +57,12 @@ signatures, defaults and error types follow Semantic Versioning from this releas
 - Tests that read RFC 9530 (every digest value it prints), its erratum 8890, RFC 9651, the
   IANA registry, RFC 9260, RFC 7143, RFC 1950, the POSIX `cksum` page and the CRC catalogue
   from fetched copies; that compare every algorithm with output captured from GNU coreutils,
-  Windows certutil, the Java runtime and Node.js; that compare the parser with `http_sf` and
+  Windows certutil and the Java runtime, with Node.js decoding the Brotli example of
+  erratum 8890; that compare the parser with `http_sf` and
   the built values with `requests-http-signature`; seeded fuzz, linear-time and installed
   wheel tests; and the PyPI release 0.2.0 as an oracle for the upgrade.
 
-## [0.2.0]
+## [0.2.0] - 2026-10-18
 
 ### Added
 
