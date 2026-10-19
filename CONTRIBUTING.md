@@ -6,11 +6,18 @@ Thanks for taking the time. This project keeps a small, predictable shape.
 
 ```
 pip install -r requirements-dev.txt
-python scripts/fetch_vectors.py
+python scripts/fetch_upstream.py
 ```
 
-The second line downloads the httpwg structured-field test corpus, which is not kept in the
-repository. Without it, the tests that use it are skipped.
+The second line downloads the third-party files the tests read: RFC 9530 and its erratum,
+RFC 9651, the IANA registry, the httpwg structured-field test corpus, and the RFCs, POSIX
+page and catalogue that define the checksums. They are not kept in the repository;
+`tests/upstream/MANIFEST.json` records each URL, revision, size and sha256. Without them,
+the tests that use them are skipped.
+
+The checksum values captured from real programs (GNU coreutils, Windows certutil, the
+Java runtime), and Node.js decoding the Brotli example of erratum 8890, are in
+`tests/program_output.json`, written by `scripts/capture_program_output.py`.
 
 ## Before you open a pull request
 

@@ -1,6 +1,9 @@
-"""Build the wheel, install it in a throwaway venv and drive the installed package.
+"""Build the wheel and sdist, inspect them, install the wheel in a throwaway venv, drive it.
 
-Slow and needs the build backend, so it runs only with CONTENTDIGEST_E2E=1.
+Slow and needs the build backend and network, so it runs only with CONTENTDIGEST_E2E=1 and
+from a source tree: a git checkout or an unpacked sdist. Only a checkout can list its tracked
+files, so the exact sdist listing is compared there alone. tests/test_e2e_upgrade.py adds the
+upgrade from PyPI.
 """
 
 from __future__ import annotations
@@ -8,82 +11,159 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
+import tarfile
 import venv
+import zipfile
 from pathlib import Path
 
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
+BODY = b'{"hello": "world"}'
+FIELD = "sha-256=:X48E9qOokqqrvdts8nOJRJN3OWDUoyWxBf7kbu9DBPE=:"
 
 pytestmark = pytest.mark.skipif(
-    os.environ.get("CONTENTDIGEST_E2E") != "1", reason="set CONTENTDIGEST_E2E=1 to build"
+    os.environ.get("CONTENTDIGEST_E2E") != "1" or not (ROOT / "src").is_dir(),
+    reason="set CONTENTDIGEST_E2E=1 in a source tree to build and install",
 )
 
 PROGRAM = r"""
-import importlib.metadata, importlib.resources
+import importlib.metadata, importlib.resources, pickle, typing
 import contentdigest as cd
+from contentdigest import (
+    ACTIVE_ALGORITHMS, DEPRECATED_ALGORITHMS, SUPPORTED_ALGORITHMS, DigestError, Digester,
+    Verifier, choose_algorithm, make_digest, make_want, parse, parse_want, verify,
+)
 
 assert "site-packages" in cd.__file__, cd.__file__
-assert importlib.metadata.version("contentdigest") == cd.__version__
+assert cd.__version__ == "1.0.0" == importlib.metadata.version("contentdigest")
+public = sorted(name for name in dir(cd) if not name.startswith("_"))
+assert sorted(cd.__all__) == public and len(public) == 12, public
 assert importlib.resources.files("contentdigest").joinpath("py.typed").is_file()
-assert len(cd.__all__) == 12
-
+classifiers = importlib.metadata.metadata("contentdigest").get_all("Classifier")
+assert "Development Status :: 5 - Production/Stable" in classifiers
+assert all("extra ==" in r for r in importlib.metadata.requires("contentdigest"))
 body = b'{"hello": "world"}'
-assert cd.make_digest(body) == "sha-256=:X48E9qOokqqrvdts8nOJRJN3OWDUoyWxBf7kbu9DBPE=:"
-assert cd.make_digest(body, algos=["crc32c"]) == "crc32c=:Q3lHIA==:"
-assert cd.verify("sha-256=:RK/0qy18MlBSVnWgjwz6lZEWjP/lF5HF9bvEF8FabDg==:", body + b"\n")
-assert cd.verify(cd.make_digest(body, algos=["md5"]), body, accept=["md5"])
-d = cd.Digester(["sha-512"])
-d.update(memoryview(body))
-v = cd.Verifier([d.value().encode()])
-v.update(bytearray(body))
-assert v.verify()
-assert cd.choose_algorithm("sha-512=3, sha-256=10, unixsum=0") == "sha-256"
-assert cd.parse_want(cd.make_want({"sha-256": 0})) == {"sha-256": 0}
+assert make_digest(body) == "sha-256=:X48E9qOokqqrvdts8nOJRJN3OWDUoyWxBf7kbu9DBPE=:"
+assert make_digest(body, algos=["crc32c", "UNIXSUM"]) == "crc32c=:Q3lHIA==:, unixsum=:GQU=:"
+assert verify("sha-256=:RK/0qy18MlBSVnWgjwz6lZEWjP/lF5HF9bvEF8FabDg==:", body + b"\n")
+assert verify(make_digest(body, algos=["md5"]), body, accept=["md5"])
+assert sorted(ACTIVE_ALGORITHMS) == ["sha-256", "sha-512"] and len(DEPRECATED_ALGORITHMS) == 6
+assert SUPPORTED_ALGORITHMS == ACTIVE_ALGORITHMS | DEPRECATED_ALGORITHMS
+digester = Digester(["sha-512"])
+digester.update(memoryview(body))
+verifier = Verifier([digester.value().encode()])
+verifier.update(bytearray(body))
+assert verifier.verify() and verifier.algorithms == ("sha-512",)
+assert choose_algorithm("sha-512=3, sha-256=10, unixsum=0") == "sha-256"
+assert parse_want(make_want({"SHA-256": 0})) == {"sha-256": 0}
+assert list(parse(["md5=:AAAA:", b"sha=:AAAA:"])) == ["md5", "sha"]
 for bad in ["sha-256=:AAAA:,", "sha-256=1", "SHA-256=:AAAA:"]:
     try:
-        cd.parse(bad)
-    except cd.DigestError as error:
-        assert isinstance(error, ValueError)
+        parse(bad)
+    except DigestError as error:
+        assert isinstance(error, ValueError) and len(str(error)) < 300
     else:
         raise AssertionError(bad)
-try:
-    cd.verify(cd.make_digest(body, algos=["md5"]), body)
-except cd.DigestError:
-    pass
-else:
-    raise AssertionError("deprecated algorithm verified by default")
+for call in (lambda: verify(make_digest(body, algos=["md5"]), body),
+             lambda: make_want({"sha-256": 10**5000})):
+    try:
+        call()
+    except DigestError:
+        pass
+    else:
+        raise AssertionError("no DigestError")
+assert typing.get_type_hints(make_digest)["return"] is str
+assert repr(DigestError) == "<class 'contentdigest.DigestError'>"
+assert pickle.loads(pickle.dumps(DigestError("x"))).args == ("x",)
 print("e2e ok")
 """
 
 
-def _run(*cmd: str | Path, cwd: Path | None = None, stdin: bytes | None = None) -> str:
-    result = subprocess.run(
-        [str(c) for c in cmd], cwd=cwd, input=stdin, capture_output=True, check=False
-    )
-    assert result.returncode == 0, result.stderr.decode(errors="replace")
-    return result.stdout.decode()
+def _run(*cmd: str | Path, cwd: Path, stdin: bytes = b"") -> subprocess.CompletedProcess[bytes]:
+    return subprocess.run([str(c) for c in cmd], cwd=cwd, input=stdin, capture_output=True)
 
 
-def test_installed_wheel_end_to_end(tmp_path: Path) -> None:
-    dist = tmp_path / "dist"
-    _run(sys.executable, "-m", "build", "--wheel", "--outdir", dist, ROOT)
-    (wheel,) = dist.glob("contentdigest-*.whl")
+def install(dist: Path, folder: Path, *requirements: str) -> Path:
+    """Make a venv, install the requirements (default: the built wheel), return its bin."""
+    venv.create(folder, with_pip=True)
+    bindir = folder / ("Scripts" if sys.platform == "win32" else "bin")
+    wanted = requirements or (str(next(dist.glob("contentdigest-*.whl"))),)
+    done = _run(bindir / "python", "-m", "pip", "install", "-q", *wanted, cwd=folder)
+    assert done.returncode == 0, done.stderr.decode(errors="replace")
+    return bindir
 
-    env_dir = tmp_path / "venv"
-    venv.create(env_dir, with_pip=True)
-    bindir = env_dir / ("Scripts" if sys.platform == "win32" else "bin")
-    python = bindir / "python"
-    _run(python, "-m", "pip", "install", "-q", wheel)
 
-    # Run from an empty folder so the source tree cannot shadow the install.
-    work = tmp_path / "work"
-    work.mkdir()
-    assert _run(python, "-I", "-c", PROGRAM, cwd=work).splitlines() == ["e2e ok"]
-
-    body = b'{"hello": "world"}'
+def check_program(bindir: Path, work: Path) -> None:
+    """Run the consumer program and the command from an empty folder."""
+    work.mkdir(exist_ok=True)
+    done = _run(bindir / "python", "-I", "-c", PROGRAM, cwd=work)
+    assert (done.returncode, done.stdout.decode().splitlines()) == (0, ["e2e ok"]), done.stderr
     script = bindir / ("contentdigest.exe" if sys.platform == "win32" else "contentdigest")
-    printed = _run(script, "-", cwd=work, stdin=body).strip()
-    assert printed == "sha-256=:X48E9qOokqqrvdts8nOJRJN3OWDUoyWxBf7kbu9DBPE=:"
-    checked = _run(python, "-I", "-m", "contentdigest", "--verify", printed, cwd=work, stdin=body)
-    assert checked.strip() == "match"
+    printed = _run(script, "-", cwd=work, stdin=BODY)
+    assert (printed.returncode, printed.stdout.decode().strip()) == (0, FIELD)
+    (work / "body.json").write_bytes(BODY)
+    many = _run(script, "body.json", "-a", "sha-512", "-a", "crc32c", cwd=work)
+    assert many.stdout.decode().strip().endswith(", crc32c=:Q3lHIA==:")
+    module = (bindir / "python", "-I", "-m", "contentdigest")
+    for argv, stdin, status, out in [
+        (("--verify", FIELD), BODY, 0, "match"),
+        (("--verify", FIELD), b"other", 1, "mismatch"),
+        (("--verify", "sha-256=:AAAA:,"), BODY, 2, ""),
+        (("--verify", "md5=:Sd/dVLAcvNLSq16eXua5uQ==:"), BODY, 2, ""),
+        (("--verify", "md5=:Sd/dVLAcvNLSq16eXua5uQ==:", "-a", "md5"), BODY, 0, "match"),
+        (("missing.json",), b"", 2, ""),
+    ]:
+        done = _run(*module, *argv, cwd=work, stdin=stdin)
+        assert (done.returncode, done.stdout.decode().strip()) == (status, out), argv
+        assert done.stderr.decode().startswith("contentdigest: ") is (status == 2)
+    helped = _run(*module, "--help", cwd=work)
+    assert helped.returncode == 0 and b"Exit status" in helped.stdout
+
+
+def test_wheel_and_sdist_contents(dist: Path) -> None:
+    (wheel,) = dist.glob("contentdigest-*.whl")
+    names = zipfile.ZipFile(wheel).namelist()
+    assert "contentdigest/py.typed" in names and "contentdigest/_types.py" in names
+    assert any(name.endswith(".dist-info/licenses/LICENSE") for name in names)
+    assert all(
+        name.startswith(("contentdigest/", "contentdigest-1.0.0.dist-info/")) for name in names
+    )
+    (sdist,) = dist.glob("contentdigest-*.tar.gz")
+    with tarfile.open(sdist) as archive:
+        shipped = {name.split("/", 1)[-1] for name in archive.getnames() if "/" in name}
+    for present in ("LICENSE", "GUIDE.md", "tests/upstream/MANIFEST.json", ".gitignore"):
+        assert present in shipped, present
+    assert [name for name in shipped if name.startswith("tests/upstream/")] == [
+        "tests/upstream/MANIFEST.json"
+    ]
+    assert not any(name.startswith(("IMPROVEMENTS-round", "CERT-1.0-")) for name in shipped)
+    # Exactly the tracked files minus the excluded ones, plus PKG-INFO: anything else fails.
+    # An unpacked sdist has no git work tree to list, so only a checkout runs this comparison.
+    if not (ROOT / ".git").exists():
+        pytest.skip("not a git work tree: the other content checks passed")
+    tracked = subprocess.run(
+        ["git", "-C", str(ROOT), "ls-files"], capture_output=True, text=True, check=True
+    ).stdout.split()
+    excluded = ("IMPROVEMENTS-round", "CERT-1.0-", ".github/", ".gitattributes")
+    expected = {name for name in tracked if not name.startswith(excluded)}
+    assert shipped == expected | {"PKG-INFO"}, shipped ^ (expected | {"PKG-INFO"})
+
+
+def test_installed_wheel_end_to_end(dist: Path, tmp_path: Path) -> None:
+    check_program(install(dist, tmp_path / "venv"), tmp_path / "work")
+
+
+def test_the_installed_command_exits_quietly_when_its_reader_goes_away(
+    dist: Path, tmp_path: Path
+) -> None:
+    bindir = install(dist, tmp_path / "venv")
+    script = bindir / ("contentdigest.exe" if sys.platform == "win32" else "contentdigest")
+    process = subprocess.Popen(
+        [str(script), "-"], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+    )
+    assert process.stdout is not None
+    process.stdout.close()
+    process.stdout = None
+    _, err = process.communicate(BODY, timeout=120)
+    assert (process.returncode, err) == (2, b"")

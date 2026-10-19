@@ -5,7 +5,9 @@ from __future__ import annotations
 from collections.abc import Callable, Iterable
 from typing import TypeVar
 
+from ._errors import type_name
 from ._sf_items import BareItem, Reader
+from ._types import is_bytes_like
 
 Params = dict[str, BareItem]
 Item = tuple[BareItem, Params]
@@ -13,7 +15,7 @@ InnerList = tuple[list[Item], Params]
 Member = Item | InnerList
 
 #: A field value as a server or client hands it over: text, raw bytes, or several lines.
-FieldValue = str | bytes | Iterable[str | bytes]
+FieldValue = str | bytes | bytearray | Iterable[str | bytes | bytearray]
 
 _OWS = " \t"
 _T = TypeVar("_T")
@@ -24,7 +26,17 @@ def combine(field: FieldValue) -> str:
     if isinstance(field, (str, bytes, bytearray)):
         lines: list[str | bytes | bytearray] = [field]
     else:
-        lines = list(field)
+        # Another bytes-like value would iterate as ints, and an empty one would pass as no lines.
+        try:
+            if is_bytes_like(field):
+                raise TypeError
+            lines_in = iter(field)
+        except TypeError:
+            raise TypeError(
+                "a field must be str, bytes, bytearray or an iterable of them, "
+                f"not {type_name(field)}"
+            ) from None
+        lines = list(lines_in)
     texts: list[str] = []
     for line in lines:
         # Non-ASCII needs no check here, in str or bytes: no rule of the grammar accepts such a
@@ -32,7 +44,7 @@ def combine(field: FieldValue) -> str:
         if isinstance(line, (bytes, bytearray)):
             line = bytes(line).decode("latin-1")
         elif not isinstance(line, str):
-            raise TypeError(f"a field line must be str or bytes, not {type(line).__name__}")
+            raise TypeError(f"a field line must be str, bytes or bytearray, not {type_name(line)}")
         texts.append(line)
     return ", ".join(texts)
 

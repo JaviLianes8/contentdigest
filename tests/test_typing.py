@@ -37,7 +37,9 @@ def mypy_output(tmp_path_factory: pytest.TempPathFactory) -> str:
     target = folder / "snippet.py"
     target.write_text(SNIPPET, encoding="utf-8")
     config = folder / "mypy.ini"
-    config.write_text(f"[mypy]\nmypy_path = {SRC.as_posix()}\n", encoding="utf-8")
+    # From a source tree, check the source; otherwise (an sdist run) the installed package.
+    path = f"mypy_path = {SRC.as_posix()}\n" if SRC.is_dir() else ""
+    config.write_text(f"[mypy]\n{path}", encoding="utf-8")
     cache = str(folder / "cache")
     out, err, _ = api.run(
         ["--strict", "--config-file", str(config), "--cache-dir", cache, str(target)]
