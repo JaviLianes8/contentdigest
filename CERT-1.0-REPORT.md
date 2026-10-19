@@ -176,6 +176,20 @@ fetched files, `http_sf` 1.4.0, `requests-http-signature` 1.0.0, the 0.2.0 oracl
 the live coreutils run, which needs GNU coreutils and ran on this PC) exit 0; the fuzz at ten
 times scale then passes. The commit after it changes this report only.
 
+Final run after the QA rounds, at 46df396 (the code of ff402c6), each from a fresh clone of the
+pushed commit:
+
+- Elena's PC, CPython 3.14, with the fetched files, `http_sf` 1.4.0, `requests-http-signature`
+  1.0.0, the 0.2.0 oracle, `CONTENTDIGEST_E2E=1` and `CONTENTDIGEST_E2E_PYPI=1`:
+  `ruff format --check .`, `ruff check .`, `mypy --strict src`, `mypy --strict src tests scripts`
+  and `pytest` (2240 passed, 1 skipped: the live coreutils run) exit 0, then the fuzz at ten
+  times scale passes. The e2e tests build the wheel and sdist, drive the wheel and the command
+  from an empty folder and upgrade PyPI 0.2.0 in place.
+- Elena's PC, interpreter matrix as above (built wheel in a fresh venv, sdist's own suite with
+  `src` removed, fetched files, `http_sf` and the 0.2.0 oracle present): CPython 3.10.19,
+  3.11.5, 3.12.12, 3.13.2, 3.14.2 and 3.14.2t each exit 0, `contentdigest` imported from
+  site-packages; the only skip is the live coreutils run.
+
 ## QA lenses (item 19)
 
 ### Round 1
