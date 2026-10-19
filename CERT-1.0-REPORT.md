@@ -15,8 +15,8 @@ Progress:
 - [x] Packaging, e2e and upgrade from PyPI 0.2.0, every Python (items 8, 10, 13, 14)
 - [x] Gates (item 15), final run
 - [x] PR #3 and trace guard CLEAN
-- [ ] Five QA lenses (item 19): rounds 1 to 6 fixed, awaiting re-verification
-- [ ] Independent reviewer (item 16)
+- [x] Five QA lenses (item 19): rounds 1 to 6 fixed, every lens PASS
+- [x] Independent reviewer (item 16): every item PASS at af8c8dd
 - [ ] Merge and publish (item 17), left to the maintainer
 
 ## Scorecard (author's run)
@@ -38,10 +38,10 @@ Progress:
 | 13 | pyproject 1.0.0, Production/Stable | PASS: 3.10 to 3.14 classifiers, MIT, Homepage/Source/Issues/Changelog, keywords, `dependencies = []` |
 | 14 | sdist and wheel contents | PASS: see Packaging |
 | 15 | Gates each exit 0 | PASS: see Gates |
-| 16 | Independent reviewer | pending |
-| 17 | PR and trace guard | PR #3 from `release/1.0.0`, trace guard CLEAN; merge and publish left to the maintainer |
+| 16 | Independent reviewer | PASS: every item at af8c8dd, see Independent review |
+| 17 | PR and trace guard | PASS: PR #3 from `release/1.0.0`, trace guard CLEAN at the head; merge and publish left to the maintainer |
 | 18 | Contracts bite (mutations) | PASS: 34 author mutants, all killed; the 4 first caught only by optional checks now also killed by contracts that always run |
-| 19 | Five independent QA lenses | pending |
+| 19 | Five independent QA lenses | PASS: all five, see Final QA verdicts |
 
 ## Baseline on 0.2.0 (before any change)
 
@@ -338,3 +338,64 @@ for each. The hex pickles in the new contract were checked again against the 0.2
 scripts` exit 0 here. On Elena's PC, CPython 3.14, from a fresh clone of b785f5e with this
 change applied and the fetched files present: `ruff format --check .`, `ruff check .`, `mypy --strict src` and `pytest --timeout 300` (2332 passed, 12
 skipped) exit 0.
+
+### Final QA verdicts
+
+Each lens re-ran until it had no open finding. The reports and evidence stay in the local
+certification folder (`contentdigest-cert/`), outside the repository.
+
+| Lens | Rounds run | Final verdict | Report | Commit |
+| --- | --- | --- | --- | --- |
+| a. API and docs | 1, 2, 5, 6, final | PASS | `lens-a-r3/REPORT.md` | af8c8dd |
+| b. Correctness and ground truth | 1 | PASS, no finding | round 1 report, recorded above | bd2818b |
+| c. Adversarial and robustness | 1, 5, final | PASS, 46 of 46 probes on CPython 3.10 to 3.14t | `lens-c-r2/probes3/out-*.txt` | b785f5e |
+| d. Packaging and real e2e | 1, 2 | PASS | round 2 report, recorded above | 03659c2 |
+| e. Contract strength | 1 to 6, final | PASS | `lens-e-r3/r4/results/all.json`, `base.txt`, `mut/equiv.json`, tools and `repro.py` | af8c8dd |
+
+Lens a confirmed B1 fixed at af8c8dd. Lens e confirmed G1 to G4 fixed: S08 is killed by
+`test_an_empty_buffer_of_any_shape_is_the_empty_body[crc32c]`, S18 by
+`test_a_whole_field_as_bytearray_reads_like_the_equal_bytes[Verifier]`, S19 by
+`test_an_iterables_own_error_reaches_the_caller_unchanged[error0-Verifier]` and S20 by
+`test_a_field_of_the_wrong_type_is_named_in_the_message[field7]`. It then swept the only new
+code, `_digest.__getattr__`, with 13 mutants: D01 to D04, D07 and D10 to D12 are killed by
+`tests/test_contract_pickles.py`, D05 and D06 at collection. D08 (message text), D09
+(`name.lower()`) and D13 (`startswith('Verif')`) survive and are equivalent at the public
+surface: `hasattr`, the resolved objects, exception types, `pickle.loads` results and messages
+and `from` import errors all match; only the `AttributeError` text for a missing name read
+directly on the private module differs, and pickle and import replace it with their own. As a
+ground truth check it regenerated the 0.2.0 pickles from the PyPI wheel: they are byte for
+byte the hex in `tests/test_contract_pickles.py`, and 0.2.0 instance pickles of `DigestError`,
+a checksum-only `Digester` and a checksum-only `Verifier` load and work under 1.0.0.
+
+Lenses b, c and d passed on earlier commits. The changes after them are the round 5 and 6
+fixes, which lenses a and e verified; the independent review below re-ran ground truth,
+packaging, e2e and the interpreter matrix at af8c8dd.
+
+## Independent review (item 16)
+
+A fresh reviewer audited af8c8dd against the 1.0.0 list, running each item.
+
+| # | Result |
+| --- | --- |
+| 1 | PASS: the same twelve names as 0.2.0; positional and keyword-only arguments match 0.2.0 and the GUIDE documents them; every change is in the CHANGELOG |
+| 2 | PASS: in the installed wheel the public `dir()` equals `__all__`; the docs never import from a private module |
+| 3 | PASS: every public name, method and property has a `>>>` example; the doctests pass in the full suite |
+| 4 | PASS: `mypy --strict src` and `mypy --strict src tests scripts` exit 0; `py.typed` ships; `get_type_hints` resolves |
+| 5 | PASS: a 1.2 MB algorithm name gives an 89-character `DigestError`; wrong types raise `TypeError` |
+| 6 | PASS: the `test_contract*.py` files are green |
+| 7 | PASS: `fetch_upstream` re-fetched all 30 files, every size and sha256 matches the MANIFEST; the RFC 9530 `sha-512` example recomputes with `hashlib` alone; the live GNU coreutils 8.32 test passed; the `http_sf` 1.4.0 and `requests-http-signature` 1.0.0 oracles are green; hand-written data is labelled |
+| 8 | PASS: e2e tests green with `CONTENTDIGEST_E2E=1` and `CONTENTDIGEST_E2E_PYPI=1`; PyPI 0.2.0 upgraded in place to the built wheel in a throwaway venv and driven with `-I` from an empty folder; the command exits 0 on a match, 1 on a mismatch, 2 on bad input, a field with only `Deprecated` members or a missing file; standard input works |
+| 9 | PASS: the fuzz passes at `CONTENTDIGEST_FUZZ_SCALE=10`; the linear-time tests are green |
+| 10 | PASS: on Elena's PC, CPython 3.10.19, 3.11.14, 3.12.12, 3.13.11, 3.14.2 and 3.14.2t, built wheel in a fresh venv and the sdist's own suite with `src` removed: pytest exits 0 on each, environmental skips only; 3.8 and 3.9 are below `requires-python >=3.10`, as in 0.2.0 |
+| 11 | PASS: `twine check --strict` passes for wheel and sdist; the README renders and every link is absolute; the compared versions were checked on PyPI. The GUIDE link points at `main`, where `GUIDE.md` appears once this branch is merged |
+| 12 | PASS: `[1.0.0] - 2026-10-19` |
+| 13 | PASS: 1.0.0, Production/Stable, 3.10 to 3.14 classifiers, `License-Expression: MIT`, Homepage, Source, Issues and Changelog URLs, keywords, dev extras only |
+| 14 | PASS: the wheel holds the 12 modules, `py.typed` and the LICENSE; the sdist has no process notes, `.github` or fetched third-party files, only the upstream MANIFEST |
+| 15 | PASS: on Elena's PC from a fresh clone, CPython 3.14.2, with the oracles and e2e switches: `ruff format --check .`, `ruff check .`, `mypy --strict src` and `pytest` each exit 0 (2344 passed, 1 skipped: the live coreutils run, which passed on this PC) |
+| 16 | PASS: this review |
+| 17 | PASS: PR #3 open from `release/1.0.0`, trace guard CLEAN; merge left to the maintainer |
+| 18 | PASS: the 34-mutant table above; six fresh reviewer mutants all killed (little-endian `unixsum`, `any()` in verify, excerpt limit 41, `crc32c` final xor dropped, `cksum` polynomial off by one, `str` body accepted) |
+| 19 | PASS: the five lens reports exist and match the table above |
+
+The reviewer also checked that every source file is at most 200 lines, that `.github` holds
+only `FUNDING.yml`, and that Javier Lianes is the only author.
