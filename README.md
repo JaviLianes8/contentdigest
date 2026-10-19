@@ -159,13 +159,14 @@ changed from 0.2.0.
 
 ## Why this package
 
-In Python, these fields otherwise turn up inside HTTP signing libraries (checked in October
-2026):
+In Python, these fields otherwise turn up inside HTTP signing libraries (checked on
+19 October 2026):
 
-- `requests-http-signature` 0.7.1 (its latest release, April 2022) sets `Content-Digest` with
-  `sha-256` or `sha-512` while signing a Requests request, and its verifier rejects a field
-  that carries any other algorithm as well.
-- `http-message-signatures` 2.0.1 leaves checking the content digest to the caller, as its
+- `requests-http-signature` 1.0.0 sets `Content-Digest` with `sha-256` or `sha-512` while
+  signing a Requests request. Its verifier rejects a field that carries any other algorithm
+  as well, unless the signature covers a single member, and a streamed body must come with
+  its digest already computed.
+- `http-message-signatures` 2.1.0 leaves checking the content digest to the caller, as its
   README says.
 - `http_sf` and `http-sfv` parse structured fields in general; the hashing, the registry and
   the preference fields stay with you.

@@ -1,13 +1,13 @@
 """Independent implementations as oracles; each test skips when its oracle is not installed.
 
-- http_sf 1.3.1 (by Mark Nottingham, an author of RFC 9651): on seeded valid and broken
-  dictionary fields, this parser with a strict byte-sequence decoder swapped in (the one
-  http_sf uses, base64 with validate=True) gives the same fields, values and failures; the
-  real parser accepts a superset, the padding leniencies of RFC 9651 section 4.2.7, with the
-  same values wherever the strict one succeeds. Two differences are http_sf's: it refuses an
-  empty dictionary, and dates a Python datetime cannot hold.
-- requests-http-signature 0.7.1 (pyauth): the Content-Digest it builds for sha-256 and
-  sha-512 is the one make_digest builds, and verify accepts it.
+- http_sf 1.3.1 and 1.4.0 (by Mark Nottingham, an author of RFC 9651): on seeded valid and
+  broken dictionary fields, this parser with a strict byte-sequence decoder swapped in (the
+  one http_sf uses, base64 with validate=True) gives the same fields, values and failures;
+  the real parser accepts a superset, the padding leniencies of RFC 9651 section 4.2.7, with
+  the same values wherever the strict one succeeds. The differences are http_sf's: before
+  1.4.0 it refused an empty dictionary, and it stops at dates a Python datetime cannot hold.
+- requests-http-signature 0.7.1 and 1.0.0 (pyauth): the Content-Digest it builds for
+  sha-256 and sha-512 is the one make_digest builds, and verify accepts it.
 """
 
 from __future__ import annotations
@@ -17,6 +17,7 @@ import binascii
 import random
 from datetime import datetime
 from decimal import Decimal
+from importlib import metadata
 from typing import Any
 
 import generators
@@ -92,6 +93,8 @@ def _texts(seed: int, count: int) -> list[str]:
 @pytest.mark.parametrize("seed", [9651, 8941])
 def test_http_sf_agrees_with_the_strict_parser(seed: int, monkeypatch: pytest.MonkeyPatch) -> None:
     http_sf = pytest.importorskip("http_sf")
+    release = tuple(int(part) for part in metadata.version("http-sf").split(".")[:2])
+    empty = ("ok", []) if release >= (1, 4) else ("fail", False)
     texts = _texts(seed, 15_000)
     with monkeypatch.context() as patch:
         patch.setattr(Reader, "byte_sequence", _strict_byte_sequence)
@@ -104,8 +107,8 @@ def test_http_sf_agrees_with_the_strict_parser(seed: int, monkeypatch: pytest.Mo
             counts["date-limit"] += 1  # http_sf stopped early; nothing to compare
         elif not text.strip(" "):
             # RFC 9651 4.2.2 step 3 (and the httpwg "empty dictionary" case) give an empty
-            # dictionary; http_sf raises "Trailing delimiter" instead.
-            assert (ours, theirs) == (("ok", []), ("fail", False)), repr(text)
+            # dictionary; http_sf before 1.4.0 raises "Trailing delimiter" instead.
+            assert (ours, theirs) == (("ok", []), empty), repr(text)
             counts["empty"] += 1
         else:
             assert (ours if ours[0] == "ok" else ("fail", False)) == theirs, text

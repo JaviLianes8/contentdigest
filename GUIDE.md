@@ -195,8 +195,8 @@ Every result 0.2.0 gave for valid input is the same; the differences are in erro
   `sha512sum`), Windows `certutil` and the Java 21 runtime (`Adler32`, `CRC32C`) for 27 inputs,
   the largest just over 1 MiB (`tests/program_output.json`).
 - `http_sf`, by an author of RFC 9651: with its strict base64 decoding swapped in, this parser
-  gives the same results on 30,000 seeded valid and broken dictionaries, apart from two limits of
-  `http_sf` (it refuses an empty dictionary, and dates beyond Python's `datetime`); without the
-  swap it accepts a superset with the same values. `requests-http-signature` builds the same
-  `Content-Digest` values.
+  gives the same results on 30,000 seeded valid and broken dictionaries, apart from limits of
+  `http_sf` (before 1.4.0 it refused an empty dictionary; it stops at dates beyond Python's
+  `datetime`); without the swap it accepts a superset with the same values.
+  `requests-http-signature` builds the same `Content-Digest` values.
 - Seeded fuzz and linear-time tests, and the PyPI release 0.2.0 as an oracle for the upgrade.
