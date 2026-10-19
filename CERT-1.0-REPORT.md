@@ -169,6 +169,9 @@ those rules from the RFC 9651 grammar; run alone, it kills all four.
 
 ## Gates (item 15)
 
-On Elena's PC from a fresh clone, each command on its own: `ruff format --check .`,
-`ruff check .`, `mypy --strict src`, `mypy --strict src tests scripts` and `pytest` with every
-optional check present, then the fuzz at ten times scale. Final run recorded below.
+At ec9b81d on Elena's PC from a fresh clone, CPython 3.14, each command on its own, with the
+fetched files, `http_sf` 1.4.0, `requests-http-signature` 1.0.0, the 0.2.0 oracle,
+`CONTENTDIGEST_E2E=1` and `CONTENTDIGEST_E2E_PYPI=1`: `ruff format --check .`, `ruff check .`,
+`mypy --strict src`, `mypy --strict src tests scripts` and `pytest` (2105 passed, 1 skipped:
+the live coreutils run, which needs GNU coreutils and ran on this PC) exit 0; the fuzz at ten
+times scale then passes. The commit after it changes this report only.
