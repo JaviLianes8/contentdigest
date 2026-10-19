@@ -253,3 +253,24 @@ Verification: on this PC the check was cut back one at a time to `(str, bytes, b
 exit 0 here. On Elena's PC, CPython 3.14, from a fresh clone of 331d3db (without the fetched
 files or the oracles): `ruff format --check .`, `ruff check .`, `mypy --strict src` and `pytest`
 exit 0.
+
+### Round 4
+
+Lens e re-ran on d70e546. It confirmed F7 fixed and judged its surviving mutants N08, N09 and
+N20 (message wording only) equivalent. Its four new findings are fixed in ff402c6; none is
+disputed. The name-collection contract moved to `tests/test_contract_names.py`.
+
+| Lens | Finding | Change |
+| --- | --- | --- |
+| e G1 (N10) | Nothing pinned that subclasses of `str` and `bytes` are refused as a name collection | The contract now sends a `str` subclass and a `bytes` subclass, empty and not, through `make_digest`, `verify`, `choose_algorithm`, `Digester` and `Verifier`, expecting `TypeError` |
+| e G2 (N18) | Other bytes-like values (`array.array`, `mmap`) still passed as a name collection; an empty one counted as no names | `algorithm_names` refuses `str` and any object that exports the buffer protocol (also when the exporter refuses its bytes, as a closed `mmap` or a released `memoryview` does). New cases `array("B")`, `array("B", b"sha-256")`, `array("I", [1, 2])`, an open and a closed `mmap`, and a released `memoryview`; 25 cases were red before the fix. GUIDE error table, Upgrading and CHANGELOG say so |
+| e G3 (N29) | Nothing pinned which occurrence of a repeated name sets the member order | New `test_a_repeated_name_keeps_the_place_of_its_first_occurrence` asserts the exact `make_digest` and `Digester` output for `["sha-256", "sha-512", "SHA-256"]` and `["sha-512", "sha-256", "sha-512"]`; the GUIDE says the first occurrence keeps its place |
+| e G4 (N32) | Nothing pinned that one-shot iterables work as `algos`, `accept` and `supported` | New `test_a_one_shot_iterable_is_a_name_collection` passes a generator and two iterators to all five entry points and asserts the normal result; the GUIDE says any iterable works |
+
+Verification: on this PC each mutant was applied to the fixed source one at a time (exact
+`type(names) is str`, keep-last deduplication, `iter(names) is names` refused, the round 3 check
+`(str, bytes, bytearray, memoryview)`, and a closed exporter taken as not bytes-like);
+`tests/test_contract_names.py` fails for each. `ruff format --check .`, `ruff check .`,
+`mypy --strict src` and `mypy --strict src tests scripts` exit 0 here. On Elena's PC, CPython
+3.14, from a fresh clone of ff402c6: `ruff format --check .`, `ruff check .`,
+`mypy --strict src` and `pytest --timeout 300` exit 0.
